@@ -1,4 +1,12 @@
-import dlib, cv2
+import dlib, cv2, os, numpy as np
+from tqdm import tqdm
+from matplotlib import pyplot as plt
+from skimage.feature import hog
+from sklearn.preprocessing import label_binarize
+from sklearn.model_selection import train_test_split
+from sklearn.neural_network import MLPClassifier
+from sklearn.metrics import roc_curve, auc
+from descriptors.LocalDescriptors import WeberPattern, LocalBinaryPattern
 
 def get_cascades():
     face_cascade = cv2.CascadeClassifier('cascades/haarcascade_frontalface_default.xml')
@@ -135,3 +143,194 @@ def extract_face_and_modalities_dlib(path, preprocessing = True, clahe_then_moda
         # cv2.rectangle(img, (nx1 - padding_x, ny1 - padding_y), (nx2 + padding_x, ny2 + padding_y), (255, 255, 0), 2)
 
     return img
+
+def show_descriptors_performance():
+    samples =  745
+    path = 'data/modalities/'
+
+    size = (320, 320)
+
+    left_eyes = [os.path.join(path, x) for x in os.listdir(path) if 'left eye' in x]
+    right_eyes = [os.path.join(path, x) for x in os.listdir(path) if 'right eye' in x]
+    mouths = [os.path.join(path, x) for x in os.listdir(path) if 'mouth' in x]
+    noses = [os.path.join(path, x) for x in os.listdir(path) if 'nose' in x]
+    faces = [os.path.join('data/preprocessed', x) for x in os.listdir('data/preprocessed')]
+    negatives = [os.path.join('data/negative/img', x) for x in os.listdir('data/negative/img')]
+
+    train_labels_total = []
+    train_data_total = []
+
+    clusters = 50
+    params = dict(algorithm = 1, trees = 5)
+    extractors = [cv2.SIFT_create(), cv2.xfeatures2d.SURF_create()]
+
+    for extractor in extractors:
+        train_labels = []
+        train_data = []
+        
+        matcher = cv2.FlannBasedMatcher(params, {})
+        BOWKmeans = cv2.BOWKMeansTrainer(clusters)
+        BOWExtractor = cv2.BOWImgDescriptorExtractor(extractor, matcher)
+        
+        for i in tqdm(range(int(samples * 0.25))):
+            try:
+                left_eye = cv2.resize(cv2.imread(left_eyes[i], cv2.IMREAD_GRAYSCALE), size)
+                right_eye = cv2.resize(cv2.imread(right_eyes[i], cv2.IMREAD_GRAYSCALE), size)
+                mouth = cv2.resize(cv2.imread(mouths[i], cv2.IMREAD_GRAYSCALE), size)
+                nose = cv2.resize(cv2.imread(noses[i], cv2.IMREAD_GRAYSCALE), size)
+                
+                # face = cv2.resize(cv2.imread(faces[i], cv2.IMREAD_GRAYSCALE), size)
+                # negative = cv2.resize(cv2.imread(negatives[i], cv2.IMREAD_GRAYSCALE), size)
+                
+                _, descriptor_left_eye = extractor.compute(left_eye, extractor.detect(left_eye))
+                _, descriptor_right_eye = extractor.compute(right_eye, extractor.detect(right_eye))
+                _, descriptor_mouth = extractor.compute(mouth, extractor.detect(mouth))
+                _, descriptor_nose = extractor.compute(nose, extractor.detect(nose))
+                
+                BOWKmeans.add(descriptor_left_eye)
+                BOWKmeans.add(descriptor_right_eye)
+                BOWKmeans.add(descriptor_mouth)
+                BOWKmeans.add(descriptor_nose)
+                
+                # _, descriptor_face = extractor.compute(face, extractor.detect(face))
+                # _, descriptor_negative = extractor.compute(negative, extractor.detect(negative))
+                # BOWKmeans.add(descriptor_face)
+                # BOWKmeans.add(descriptor_negative)
+            except:
+                pass
+
+        vocabulary = BOWKmeans.cluster()
+        BOWExtractor.setVocabulary(vocabulary)
+
+
+        for i in tqdm(range(samples)):
+            
+            left_eye = cv2.resize(cv2.imread(left_eyes[i], cv2.IMREAD_GRAYSCALE), size)
+            right_eye = cv2.resize(cv2.imread(right_eyes[i], cv2.IMREAD_GRAYSCALE), size)
+            mouth = cv2.resize(cv2.imread(mouths[i], cv2.IMREAD_GRAYSCALE), size)
+            nose = cv2.resize(cv2.imread(noses[i], cv2.IMREAD_GRAYSCALE), size)
+            
+            # face = cv2.resize(cv2.imread(faces[i], cv2.IMREAD_GRAYSCALE), size)
+            # negative = cv2.resize(cv2.imread(negatives[i], cv2.IMREAD_GRAYSCALE), size)
+            
+            try:
+                features_left_eye = BOWExtractor.compute(left_eye, extractor.detect(left_eye))
+                features_right_eye = BOWExtractor.compute(left_eye, extractor.detect(right_eye))
+                features_mouth = BOWExtractor.compute(left_eye, extractor.detect(mouth))
+                features_nose = BOWExtractor.compute(left_eye, extractor.detect(nose))
+                
+                if(not np.any(features_left_eye)):
+                    continue
+                elif(not np.any(features_right_eye)):
+                    continue
+                elif(not np.any(features_mouth)):
+                    continue
+                elif(not np.any(features_nose)):
+                    continue
+
+                train_data.append(features_left_eye.ravel())
+                train_data.append(features_right_eye.ravel())
+                train_data.append(features_mouth.ravel())
+                train_data.append(features_nose.ravel())
+                train_labels.append(1)
+                train_labels.append(2)
+                train_labels.append(3)
+                train_labels.append(4)
+                
+                # features_face = BOWExtractor.compute(face, extractor.detect(face))
+                # features_negative = BOWExtractor.compute(negative, extractor.detect(negative))
+                
+                # if(not np.any(features_face)):
+                #     continue
+                # elif(not np.any(features_negative)):
+                #     continue
+                
+                # train_data.append(features_face.ravel())
+                # train_data.append(features_negative.ravel())
+                # train_labels.append(1)
+                # train_labels.append(2)
+            except:
+                pass
+        
+        train_labels_total.append(train_labels)
+        train_data_total.append(train_data)
+            
+
+
+    local_descriptors = [WeberPattern().describe, LocalBinaryPattern(24, 8).describe, hog]
+
+    for local in local_descriptors:
+            
+        train_labels = []
+        train_data = []
+        for i in tqdm(range(samples)):
+            left_eye = cv2.resize(cv2.imread(left_eyes[i], cv2.IMREAD_GRAYSCALE), size)
+            right_eye = cv2.resize(cv2.imread(right_eyes[i], cv2.IMREAD_GRAYSCALE), size)
+            mouth = cv2.resize(cv2.imread(mouths[i], cv2.IMREAD_GRAYSCALE), size)
+            nose = cv2.resize(cv2.imread(noses[i], cv2.IMREAD_GRAYSCALE), size)
+
+            # face = cv2.resize(cv2.imread(faces[i], cv2.IMREAD_GRAYSCALE), size)
+            # negative = cv2.resize(cv2.imread(negatives[i], cv2.IMREAD_GRAYSCALE), size)
+            
+            fd_1 = local(left_eye)
+            fd_2 = local(right_eye)
+            fd_3 = local(mouth)
+            fd_4 = local(nose)
+            
+            train_labels.append(1)
+            train_labels.append(2)
+            train_labels.append(3)
+            train_labels.append(4)
+            
+            train_data.append(fd_1)
+            train_data.append(fd_2)
+            train_data.append(fd_3)
+            train_data.append(fd_4)
+            
+            # fd_1 = local(face)
+            # fd_2 = local(negative)
+            
+            # train_data.append(fd_1)
+            # train_data.append(fd_2)
+            # train_labels.append(1)
+            # train_labels.append(2)
+        
+        train_data_total.append(train_data)
+        train_labels_total.append(train_labels)
+
+
+    descriptors = ['SIFT', 'SURF',  'Weber', 'LBP', 'HOG']
+    modalities = ['left eye', 'right eye', 'mouth', 'nose']
+    line_styles = [':', '-', '--', '-.']
+    colors = ['darkorange', 'forestgreen', 'aqua', 'salmon']
+    i = 0
+    for train_data, train_labels in zip(train_data_total, train_labels_total):
+        
+        train_labels = label_binarize(train_labels, classes = [1, 2, 3, 4])
+        X_train, X_test, y_train, y_test = train_test_split(train_data, train_labels, test_size = 0.25, train_size = 0.75)
+        mlp = MLPClassifier((196, 256, 128), max_iter = 10000)
+        mlp.fit(X_train, y_train)
+
+        y_pred = mlp.predict(X_test)
+        y_true = y_test
+        y_score = mlp.predict_proba(X_test)
+        
+        if i < 3:
+            plt.subplot(3, 3, i + 1)
+        else:
+            plt.subplot(2, 2, i)
+            
+        for j in range(len(modalities)):
+            fpr, tpr, _ = roc_curve(y_true[:, j], y_score[:, j])
+            AUC = auc(fpr, tpr)
+            
+            plt.plot(fpr, tpr, lw = 2, color = colors[j], linestyle = line_styles[j], label = f'ROC curve for {modalities[j]} with AUC = {round(AUC, 5)}')
+        
+        plt.title(f'ROC curve for all modalities for descriptor {descriptors[i]}')
+        plt.ylabel('True Positive Rate')
+        plt.xlabel('False Positive Rate')
+        plt.legend(loc = 'lower right')
+        i += 1
+
+    plt.subplots_adjust(wspace = 0.15, hspace = 0.05)
+    plt.show()
