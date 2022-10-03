@@ -1,7 +1,12 @@
 import cv2, os, numpy as np, random, time, pickle
+import utils, tensorflow as tf, keras, fusion
+from descriptors.BOWDescriptors import SIFTBOWFeatures, SURFBOWFeatures
+from keras.layers import Dense, Input
+from keras.models import Sequential
+from keras.optimizers import Adam
+from keras.metrics import categorical_crossentropy
 from tqdm import tqdm
-from skimage.feature import hog, local_binary_pattern
-from skimage import data
+from skimage.feature import hog
 from sklearn.metrics import classification_report, roc_curve, auc
 from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPClassifier
@@ -9,97 +14,110 @@ from sklearn.svm import SVC
 from descriptors.LocalDescriptors import WeberPattern, LocalBinaryPattern
 from matplotlib import pyplot as plt
 from sklearn.preprocessing import label_binarize
-from keras.applications.resnet import preprocess_input, ResNet50
+from keras.applications.vgg16 import preprocess_input, VGG16
 from keras.utils import to_categorical
 from descriptors.GIST import GIST
 
-samples =  745
-path = 'data/modalities/'
-
 size = 224
-
-left_eyes = [os.path.join(path, x) for x in os.listdir(path) if 'left eye' in x]
-right_eyes = [os.path.join(path, x) for x in os.listdir(path) if 'right eye' in x]
-mouths = [os.path.join(path, x) for x in os.listdir(path) if 'mouth' in x]
-noses = [os.path.join(path, x) for x in os.listdir(path) if 'nose' in x]
+path = 'data/modalities'
+people_count = 1889
+left_eyes = [os.path.join(path, 'left eye', image) for image in os.listdir(os.path.join(path, 'left eye')) if image.endswith('.jpg')][:people_count]
+right_eyes = [os.path.join(path, 'right eye', image) for image in os.listdir(os.path.join(path, 'right eye')) if image.endswith('.jpg')][:people_count]
+mouths = [os.path.join(path, 'mouth', image) for image in os.listdir(os.path.join(path, 'mouth')) if image.endswith('.jpg')][:people_count]
+noses = [os.path.join(path, 'nose', image) for image in os.listdir(os.path.join(path, 'nose')) if image.endswith('.jpg')][:people_count]
 faces = [os.path.join('data/preprocessed', x) for x in os.listdir('data/preprocessed')]
 negatives = [os.path.join('data/negative/img', x) for x in os.listdir('data/negative/img')]
 
-train_data = []
-train_labels = []
+dnn = VGG16(include_top = False, weights = 'imagenet', input_shape = (size, size, 3))
+for layer in dnn.layers:
+    layer.trainable = False
 
 param = {
-        "orientationsPerScale":np.array([8,8]),
-         "numberBlocks":[10,10],
+        "orientationsPerScale":np.array([5,5]),
+         "numberBlocks":[5,5],
         "fc_prefilt":10,
-        "boundaryExtension": 10
-        
+        "boundaryExtension": 10 
 }
 
+weber = WeberPattern(grid_shape = (7, 7))
+lbp = LocalBinaryPattern(num_points = 32, radius = 8, grid_shape = (7, 7))
 gist = GIST(param)
 
-for i in tqdm(range(samples)):
-    left_eye = gist._gist_extract(cv2.resize(cv2.imread(left_eyes[i], cv2.IMREAD_GRAYSCALE), (size, size)))
-    right_eye = gist._gist_extract(cv2.resize(cv2.imread(right_eyes[i], cv2.IMREAD_GRAYSCALE), (size, size)))
-    mouth = gist._gist_extract(cv2.resize(cv2.imread(mouths[i], cv2.IMREAD_GRAYSCALE), (size, size)))
-    nose = gist._gist_extract(cv2.resize(cv2.imread(noses[i], cv2.IMREAD_GRAYSCALE), (size, size)))
+def hog_features(images):
+    features = []
+    print('processing hog features...')
+    for i in tqdm(range(len(images))):
+        img = cv2.cvtColor(images[i], cv2.COLOR_BGR2GRAY)
+        f = hog(img)
+        features.append(f)
+    return features
 
-    train_data.append(left_eye)
-    train_data.append(right_eye)
-    train_data.append(mouth)
-    train_data.append(nose)
+def gist_features(images):
+    features = []
+    print('processing GIST features...')
+    for i in tqdm(range(len(images))):
+        img = cv2.cvtColor(images[i], cv2.COLOR_BGR2GRAY)
+        f = gist._gist_extract(img)
+        features.append(f)
+    return features
+
+#all the samples are equal in amount
+images_number = len(left_eyes)
+left_eye_images = []
+right_eye_images = []
+mouth_images = []
+nose_images = []
+face_images = []
+negative_images = []
+
+print('loading images...')
+for i in tqdm(range(images_number)):
+    left_eye = cv2.resize(cv2.imread(left_eyes[i]), (size, size))
+    right_eye = cv2.resize(cv2.imread(right_eyes[i]), (size, size))
+    mouth= cv2.resize(cv2.imread(mouths[i]), (size, size))
+    nose = cv2.resize(cv2.imread(noses[i]), (size, size))
+    face = cv2.resize(cv2.imread(faces[i]), (size, size))
+    negative = cv2.resize(cv2.imread(negatives[i % 1570]), (size, size))
     
-    train_labels.append(0)
-    train_labels.append(1)
-    train_labels.append(2)
-    train_labels.append(3)
+    left_eye_images.append(left_eye)
+    right_eye_images.append(right_eye)
+    mouth_images.append(mouth)
+    nose_images.append(nose)
+    face_images.append(face)
+    negative_images.append(negative)
     
-    # face = gist._gist_extract(cv2.resize(cv2.imread(faces[i], cv2.IMREAD_GRAYSCALE), (size, size)))
-    # negative = gist._gist_extract(cv2.resize(cv2.imread(negatives[i], cv2.IMREAD_GRAYSCALE), (size, size)))
-    
-    # train_data.append(face)
-    # train_data.append(negative)
-    # train_labels.append(0)
-    # train_labels.append(1)
-    
-    
-# train_images = np.array(train_images)
-# # train_labels = label_binarize(np.array(train_labels), classes = [0, 1])
-# train_images = preprocess_input(train_images)
-
-# cnn_model = ResNet50(include_top = False, weights = 'imagenet', input_shape = (size, size, 3))
-
-# for layer in cnn_model.layers:
-#     layer.trainable = False
-    
-# print(cnn_model.summary())
-
-# train_data = cnn_model.predict(train_images)
-# train_data = train_data.reshape(train_data.shape[0], -1)
-train_labels = label_binarize(train_labels, classes = [0, 1, 2, 3])
-X_train, X_test, y_train, y_test = train_test_split(train_data, train_labels, test_size = 0.25, train_size = 0.75)
-mlp = MLPClassifier((196, 256, 128), max_iter = 10000)
-mlp.fit(X_train, y_train)
-y_true = np.array(y_test)
+left_eye_images = np.array(left_eye_images)
+right_eye_images = np.array(right_eye_images)
+mouth_images = np.array(mouth_images)
+nose_images = np.array(nose_images)
 
 
-y_score = mlp.predict_proba(X_test)
-y_pred = mlp.predict(X_test)
+score_fusion = fusion.FeatureFusion(
+    algorithms = {
+        'vgg16' : dnn.predict,
+        'GIST' :  gist_features,      
+        'weber' : weber.compute,
+        'hog' : hog_features
+    },
+    class_names = [
+       'left eye',
+       'right eye',
+       'mouth', 
+       'nose'                                     
+    ]
+)
 
-# print(classification_report(y_true, y_pred, target_names = ['left_eye', 'right_eye', 'mouth', 'nose']))
-modalities = ['left_eye', 'right_eye', 'mouth', 'nose']
-line_styles = [':', '-', '--', '-.']
-colors = ['darkorange', 'forestgreen', 'aqua', 'salmon']
+score_fusion.extract_features([
+    left_eye_images,
+    right_eye_images,
+    mouth_images,
+    nose_images
+])
 
-for i in range(len(modalities)):
-    fpr, tpr, _ = roc_curve(y_true[:, i], y_score[:, i])
-    AUC = round(auc(fpr, tpr), 5)
-    
-    plt.plot(fpr, tpr, lw = 2, color = colors[i], linestyle = line_styles[i], label = f'ROC curve for {modalities[i]} with AUC = {AUC}')
+del left_eye_images
+del right_eye_images
+del mouth_images
+del nose_images
 
+score_fusion.train(epochs = 100)
 
-plt.title(f'ROC curve for face detection with GIST')
-plt.ylabel('True Positive Rate')
-plt.xlabel('False Positive Rate')
-plt.legend(loc = 'lower right')
-plt.show()

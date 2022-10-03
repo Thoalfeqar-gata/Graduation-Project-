@@ -49,9 +49,8 @@ class GIST():
         nr,nc = img.shape
         sr = (nr-M[0])/2
         sc = (nc-M[1])/2
-
         img = img[int(sr):int(sr+M[0])+ 1,int(sc):int(sc+M[1])+1]
-        img = img- np.min(img)
+        img = img - np.min(img)
         if np.sum(img) != 0:
             img = 255*(img/np.max(img))
 

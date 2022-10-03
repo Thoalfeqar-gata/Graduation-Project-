@@ -1,4 +1,4 @@
-import dlib, cv2, os, numpy as np
+import dlib, cv2, os, numpy as np, csv, face_recognition
 from tqdm import tqdm
 from matplotlib import pyplot as plt
 from skimage.feature import hog
@@ -6,18 +6,20 @@ from sklearn.preprocessing import label_binarize
 from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import roc_curve, auc
+from sklearn.cluster import SpectralClustering
 from descriptors.LocalDescriptors import WeberPattern, LocalBinaryPattern
+import mediapipe as mp
 
 def get_cascades():
-    face_cascade = cv2.CascadeClassifier('cascades/haarcascade_frontalface_default.xml')
-    eye_cascade = cv2.CascadeClassifier('cascades/haarcascade_eye.xml')
-    smile_cascade = cv2.CascadeClassifier('cascades/haarcascade_smile.xml')
+    face_cascade = cv2.CascadeClassifier('data/cascades/haarcascade_frontalface_default.xml')
+    eye_cascade = cv2.CascadeClassifier('data/cascades/haarcascade_eye.xml')
+    smile_cascade = cv2.CascadeClassifier('data/cascades/haarcascade_smile.xml')
     
     return face_cascade, eye_cascade, smile_cascade
 
 def get_detector_predictor():
     face_detector = dlib.get_frontal_face_detector()
-    predictor = dlib.shape_predictor('dlib data/shape_predictor_68_face_landmarks.dat')
+    predictor = dlib.shape_predictor('data/dlib data/shape_predictor_68_face_landmarks.dat')
     
     return face_detector, predictor
 
@@ -111,9 +113,8 @@ def extract_face_and_modalities_dlib(path, preprocessing = True, clahe_then_moda
                 m = [left_eye, right_eye, mouth, nose]
                 count = 0
                 for modality in m:
-                    cv2.imwrite(f'data/modalities/{order[count]} {image_number}__{detection_counter}.jpg', modality)
+                    cv2.imwrite(f'data/modalities/{order[count]}/{image_number}__{detection_counter}.jpg', modality)
                     count += 1
-                cv2.imwrite(f'data/preprocessed/{image_number}__{detection_counter}.jpg', ROI)
                 modalities.append(m)
                     
             else:
@@ -257,7 +258,7 @@ def show_descriptors_performance():
             
 
 
-    local_descriptors = [WeberPattern().describe, LocalBinaryPattern(24, 8).describe, hog]
+    local_descriptors = [WeberPattern().compute, LocalBinaryPattern(24, 8).compute, hog]
 
     for local in local_descriptors:
             
@@ -334,3 +335,136 @@ def show_descriptors_performance():
 
     plt.subplots_adjust(wspace = 0.15, hspace = 0.05)
     plt.show()
+    
+
+def seperate_dim_lit(image):
+    
+    ''' 0 => lit, 1 => lit because of open door, 2 => dim, 3 => dim with open door'''
+    
+    gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    
+    average_brightness = gray_image.sum() / (gray_image.shape[0] * gray_image.shape[1])
+    hist = np.histogram(gray_image, bins = np.arange(0, 255))[0]
+    hist = hist / (hist.max() + 1e-7)
+    hist_average_125_175 = hist[125:175].sum() / 50
+        
+    if average_brightness > 100:
+        if hist_average_125_175 > 0.15:
+            return 1
+        else:
+            return 0
+    else:
+        if hist_average_125_175 > 0.15:
+            return 3
+        else:
+            return 2
+    
+def extract_face_info(img, mesh_detector):
+    
+    pts = face_mesh_mp(img, mesh_detector)
+    
+    if(pts is not None):
+        nose_tip = pts[1]
+        right_eye = pts[386]
+        left_eye = pts[159]
+        mouth = pts[14]
+        
+        nose_tip_depth = nose_tip[2]
+        right_eye_depth = right_eye[2]
+        left_eye_depth = left_eye[2]
+        mouth_depth = mouth[2]
+        
+        right_eye_visible = True
+        left_eye_visible = True
+        mouth_visible = True
+        
+        difference_thresh = 0.125
+        if right_eye_depth > (left_eye_depth + difference_thresh):
+            right_eye_visible = False
+        elif left_eye_depth > (right_eye_depth + difference_thresh):
+            left_eye_visible = False
+        if mouth_depth > (left_eye_depth + difference_thresh) or mouth_depth > (right_eye_depth + difference_thresh):
+            mouth_visible = False
+            
+        return [right_eye_visible, left_eye_visible, mouth_visible]
+    else:
+        return [None, None, None]
+        
+        
+        
+def face_mesh_mp(img, mesh_detector):
+    h, w = img.shape[:2]
+
+    results = mesh_detector.process(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    
+    points = []
+    
+    if results.multi_face_landmarks:
+        for face in results.multi_face_landmarks:
+            for landmark in face.landmark:
+                points.append([int(landmark.x * w), int(landmark.y * h), landmark.z])
+            break
+        return points
+    else:
+        return None
+
+def extract_faces_from_database(images_path, output_path, face_detection_confidence = 0.7):
+    mesh_detector = mp.solutions.face_mesh.FaceMesh(static_image_mode = True,
+                                                    max_num_faces = 1,
+                                                    refine_landmarks = True,
+                                                    min_detection_confidence = face_detection_confidence)
+    image_paths = []
+    for dir, dirnames, filenames in os.walk(images_path):
+        if len(filenames) > 0:
+            for filename in filenames:
+                if filename.endswith('.jpg'):
+                    image_paths.append(os.path.join(dir, filename))
+    
+    detection_data = []
+    for i in tqdm(range(len(image_paths))):
+        img = cv2.imread(image_paths[i])
+        lighting_condition = seperate_dim_lit(img)
+        
+        boxes = face_recognition.face_locations(img, 1, model = 'cnn')
+        if len(boxes) <= 0:
+            continue
+        encodings = face_recognition.face_encodings(img, boxes, 5, 'large')
+        
+        data = [{'encoding' : encoding, 'location' : box, 'image path' : image_paths[i], 'lighting condition' : lighting_condition} for encoding, box in zip(encodings, boxes)]
+        detection_data.extend(data)
+    
+    encodings = [data['encoding'] for data in detection_data]
+    clt = SpectralClustering(n_clusters = 30, n_jobs = -1)
+    clt.fit(encodings)
+    
+    padding = 20
+    labelIDs = np.unique(clt.labels_)
+    for labelID in labelIDs:
+        indexes = np.where(clt.labels_ == labelID)[0]
+            
+        if not os.path.isdir(os.path.join(output_path, str(labelID))):
+            os.mkdir(os.path.join(output_path, str(labelID)))
+        
+        for i in indexes:
+            face = cv2.imread(detection_data[i]['image path'])
+            h,w = face.shape[:2]
+            face_location = detection_data[i]['location']
+            (top, right, bottom, left) = face_location
+            
+            top = max(0, top - padding)
+            left = max(0, left - padding)
+            bottom = min(h, bottom + padding)
+            right = min(w, right + padding)
+            
+            face = face[top : bottom, left : right]
+            [right_eye_visible, left_eye_visible, mouth_visible] = extract_face_info(face, mesh_detector)
+            
+            if right_eye_visible == None or left_eye_visible == None or mouth_visible == None:
+                continue
+            
+            name = f'{i}_C_{str(int(lighting_condition))}_R_{str(int(right_eye_visible))}_L_{str(int(left_eye_visible))}_N_1_M_{str(int(mouth_visible))}.jpg'
+            cv2.imwrite(os.path.join(output_path, str(labelID), name), face)
+            
+        
+
+    
