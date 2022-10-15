@@ -1,5 +1,5 @@
-import cv2, os, numpy as np, random, time, pickle, joblib
-import utils, tensorflow as tf, keras, fusion
+import cv2, os, numpy as np, random, time, pickle, joblib, dlib
+import utils, tensorflow as tf, keras, fusion, mediapipe
 from descriptors.BOWDescriptors import SIFTBOWFeatures, SURFBOWFeatures
 from keras.layers import Dense, Input
 from keras.models import Sequential
@@ -15,24 +15,25 @@ from sklearn.svm import SVC
 from descriptors.LocalDescriptors import WeberPattern, LocalBinaryPattern
 from matplotlib import pyplot as plt
 from sklearn.preprocessing import label_binarize
-from keras.applications.vgg16 import VGG16, preprocess_input
+from keras.applications.vgg16 import preprocess_input, VGG16
 from keras.utils import to_categorical
 from descriptors.GIST import GIST
-from keras.models import Sequential
-from keras.layers import Dense, Input
-from keras.optimizers import Adam
+
+mesh_detector = mediapipe.solutions.face_mesh.FaceMesh(static_image_mode = True,
+                                       max_num_faces = 1,
+                                       refine_landmarks = True,
+                                       min_detection_confidence = 0.5)
 
 
 
 number_of_subjects = 15
 authorised_subjects = [2, 10, 20, 22, 37]
-
 path = os.path.join('data', 'database collage', 'detections', 'all faces with augmentation')
 subjects = [str(i) for i in range(number_of_subjects)]
 subjects.extend(['20', '22', '37'])
-
 print(subjects)
-size = 224
+size = 96
+
 
 dnn = VGG16(include_top = False, weights = 'imagenet', input_shape = (size, size, 3))
 for layer in dnn.layers:
@@ -54,13 +55,68 @@ for subject in subjects:
     images_folder = os.path.join(path, subject)
     image_paths = [os.path.join(images_folder, image) for image in os.listdir(images_folder)]
     
+    
     images = []
-    for image_path in image_paths:
-        image = cv2.resize(cv2.imread(image_path), (size, size))
-        images.append(image)
+    for image in image_paths:
+        img = cv2.imread(image)
+        modalities_start = image.find('R')
+        
+        if not subject == '37':
+            right_eye_visible = bool(int(image[modalities_start + 2]))
+            left_eye_visible = bool(int(image[modalities_start + 6]))
+            nose_visible = bool(int(image[modalities_start + 10]))
+            mouth_visible = bool(int(image[modalities_start + 14]))
+        else:
+            right_eye_visible = True
+            left_eye_visible = True
+            nose_visible = True
+            mouth_visible = True
+        
+        try:
+            points = np.array(utils.face_mesh_mp(img, mesh_detector))[:, :2].astype(np.uint8)
+        except:
+            continue
+        
+        right_eye_points = points[68], points[51]
+        left_eye_points = points[9], points[280]
+        mouth_points = points[205], points[379]
+        nose_points = points[65], points[436]
+        
+        right_eye = img[right_eye_points[0][1] : right_eye_points[1][1], right_eye_points[0][0] : right_eye_points[1][0]].copy()
+        left_eye = img[left_eye_points[0][1] : left_eye_points[1][1], left_eye_points[0][0] : left_eye_points[1][0]].copy()
+        mouth = img[mouth_points[0][1] : mouth_points[1][1], mouth_points[0][0] : mouth_points[1][0]].copy()
+        nose = img[nose_points[0][1] : nose_points[1][1], nose_points[0][0] : nose_points[1][0]].copy()
+        
+        
+        if not right_eye_visible:
+            right_eye = left_eye
+            if not mouth_visible:
+                mouth = left_eye
+                
+        if not left_eye_visible:
+            left_eye = right_eye
+            if not mouth_visible:
+                mouth = right_eye
+        
+        if not mouth_visible:
+            mouth = left_eye
+        
+        
+        try:
+            right_eye = cv2.resize(right_eye, (size, size))
+            left_eye = cv2.resize(left_eye, (size, size))
+            mouth = cv2.resize(mouth, (size, size))
+            nose = cv2.resize(nose, (size, size))
+        except:
+            continue
+        
+        images.append(right_eye)
+        images.append(left_eye)
+        images.append(mouth)
+        images.append(nose)
     
-    features = np.array(dnn.predict(np.array(images))).reshape(len(images), -1)
-    
+    images = np.array(images)
+    features = np.array(dnn.predict(images)).reshape(len(images) // 4, -1)
     training_data.extend(features)
     
     if int(subject) in authorised_subjects:
@@ -72,6 +128,7 @@ for subject in subjects:
 training_data = np.array(training_data)
 training_labels = np.array(training_labels)
 X_train, X_test, y_train, y_test = train_test_split(training_data, training_labels, test_size = 0.25, train_size = 0.75, shuffle = True, random_state = 250)
+print(np.unique(training_labels))
 
 model = Sequential([
     Input(shape = (training_data.shape[1])), 
@@ -103,8 +160,17 @@ plt.legend(loc = 'best')
 plt.show()
 
 
-joblib.dump(model, 'data/models/test3.joblib')
-model.save_weights('data/models/keras model 1/')
+
+    
+
+        
+    
+        
+        
+        
+        
+    
+ 
 
 
 

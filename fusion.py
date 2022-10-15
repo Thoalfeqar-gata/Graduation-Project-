@@ -94,7 +94,7 @@ class FeatureFusion(object):
         
         
 class ScoreFusion(object):
-    def __init__(self, algorithms, class_names, model_layer_sizes = (192, 256, 128), test_model = True):
+    def __init__(self, algorithms, class_names, weights = None, model_layer_sizes = (192, 256, 128), test_model = True):
         self.model_layer_sizes = model_layer_sizes
         self.algorithms = algorithms
         self.test_model = test_model
@@ -103,6 +103,11 @@ class ScoreFusion(object):
         self.training_data = []
         self.training_labels = []
         self.models = []
+        
+        if weights is not None:
+            self.weights = weights
+        else:
+            self.weights = [1 for _ in self.algorithms.keys()]
     
     def preprocess_list(self, images_list):
     
@@ -141,7 +146,7 @@ class ScoreFusion(object):
                 layers.append(Dense(size, 'relu'))
             layers.append(Dense(self.number_of_classes, activation = 'softmax'))
             
-            model = Sequential(layers)
+            model = Sequential(layers, name = list(self.algorithms.keys())[i])
             model.compile(Adam(), 'sparse_categorical_crossentropy', ['accuracy'])
             
             if self.test_model:
@@ -155,6 +160,7 @@ class ScoreFusion(object):
             models.append(model)
         self.models = models
         
+        np.random.seed(0)
         if self.test_model:
             y_pred_prob = self.vote(X_tests)
             y_bin = label_binarize(y_true, classes = list(range(self.number_of_classes)))
@@ -168,12 +174,16 @@ class ScoreFusion(object):
                 fpr, tpr, _ = roc_curve(y_bin[:, i], y_pred_prob[:, i])
                 AUC = auc(fpr, tpr)
                 
-                plt.plot(fpr, tpr, lw = 2, color = np.random.rand(3,), linestyle = line_styles[i % len(line_styles)], label = f'ROC curve for {self.class_names[i]} with AUC = {round(AUC, 5)}')
+                plt.plot(fpr, tpr, lw = 2, color = np.random.rand(3), linestyle = line_styles[i % len(line_styles)], label = f'ROC curve for {self.class_names[i]} with AUC = {round(AUC, 5)}')
             
             plt.ylabel('True Positive Rate')
             plt.xlabel('False Positive Rate')
             plt.legend(loc = 'best')
             plt.show()
+        else:
+            model.fit(self.training_data, self.training_labels, epochs = epochs, shuffle = False)
+
+        return models
 
             
     
@@ -181,13 +191,13 @@ class ScoreFusion(object):
     def vote(self, samples_per_model):
         predictions = None
         for i, model in enumerate(self.models):
-            pred = model.predict(samples_per_model[i])
+            pred = model.predict(samples_per_model[i]) * self.weights[i]
             if predictions is None:
                 predictions = pred
             else:
                 predictions = np.add(predictions, pred)
         
-        return predictions / (len(self.models) + 1e-8)
+        return predictions / (sum(self.weights) + 1e-8)
         
         
         
