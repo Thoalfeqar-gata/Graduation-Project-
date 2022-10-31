@@ -1,58 +1,74 @@
 import cv2, joblib, numpy as np, time, face_recognition, os
+from tqdm import tqdm
 from keras.applications.vgg16 import VGG16
 from keras.models import Sequential
 from keras.layers import Dense, Input
 from keras.optimizers import Adam
+from fusion import FeatureFusion, ScoreFusion
+from descriptors.LocalDescriptors import WeberPattern, LocalBinaryPattern
+from skimage.feature import hog
+from descriptors.BOWDescriptors import SIFTBOWFeatures, SURFBOWFeatures
 
-VideoCapture = cv2.VideoCapture(0)
+def hog_features(images):
+    features = []
+    for i in tqdm(range(len(images))):
+        image = cv2.cvtColor(images[i], cv2.COLOR_BGR2GRAY)
+        f = hog(image, 10, (8, 8))
+        features.append(f)
+    
+    return features
 
-dnn = VGG16(include_top = False, weights = 'imagenet', input_shape = (224, 224, 3))
+size = 224
+weber = WeberPattern((6, 6))
+lbp = LocalBinaryPattern(8, 1, (6,6))
+
+dnn = VGG16(include_top = False, input_shape = (size, size, 3))
 for layer in dnn.layers:
     layer.trainable = False
-    
-predictor = Sequential([
-    Dense(192, 'relu'),
-    Dense(256, 'relu'),
-    Dense(128, 'relu'),
-    Dense(6, 'softmax')
-])
 
-predictor.compile(Adam(), 'sparse_categorical_crossentropy', ['accuracy'])
-predictor.load_weights('data/models/keras model 1/')
+number_of_subjects = 37
+authorised_subjects = [3, 5, 7, 11, 37]
 
-path = os.path.join('data', 'database collage', 'detections', 'all faces with augmentation', '37')
-i = 0
-while True:
-    ret, frame = VideoCapture.read()
+path = os.path.join('data', 'database collage', 'detections', 'all faces with augmentation')
+subjects = [i for i in range(1, number_of_subjects + 1)]
+print(subjects)
+
+
+images_list = []
+unauthorised_list = []
+samples_count = 200
+for subject in subjects:
+    images_folder = os.path.join(path, str(subject))
+    image_paths = [os.path.join(images_folder, image) for image in os.listdir(images_folder)]
     
-    boxes = face_recognition.face_locations(frame, 1, 'cnn')
+    images = []
+    for image_path in image_paths:
+        image = cv2.resize(cv2.imread(image_path), (size, size))
+        images.append(image)
+        
+        if(len(images) >= samples_count):
+            break
     
-    for box in boxes:
-        try:
-            face = frame[box[0] - 20 : box[2] + 20, box[3] - 20 : box[1] + 20]
-            face = np.array([cv2.resize(face, (224, 224))])
-            
-            features = np.array(dnn.predict(face, verbose = 0)).reshape(1, -1)    
-            predictions = predictor.predict(features, verbose = 0)
-            prediction = np.argmax(predictions, axis = -1)
-            
-            cv2.rectangle(frame, (box[3], box[0]), (box[1], box[2]), (0, 0, 255), 1)
-            if prediction == 5:
-                cv2.putText(frame, 'Thoalfeqar', (box[3], box[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
-            else:
-                cv2.putText(frame, 'Unknown', (box[3], box[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
-        except:
-            continue 
-    
-    cv2.imshow('frames', frame)
-    key =  cv2.waitKey(1)
-    if key == ord('q'):
-        break
-    elif key == ord('a'):
-        cv2.imwrite(f'Screenshot {i}.jpg', frame)
-        i += 1
-    
-    
-cv2.destroyAllWindows()
-VideoCapture.release()
+    if subject in authorised_subjects:
+        images_list.append(images)
+    else:
+        unauthorised_list.extend(images)
+
+images_list.append(unauthorised_list)
+
+
+
+        
+class_names = [f'Subject: {i}' for i in authorised_subjects]
+class_names.append('Subject: 0')
+
+fusion = FeatureFusion([
+    SIFTBOWFeatures,
+    SURFBOWFeatures
+
+], 
+   class_names, (1024, 512, 384))
+
+fusion.extract_features(images_list)
+fusion.train(300)
     

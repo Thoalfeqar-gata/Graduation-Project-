@@ -12,48 +12,45 @@ class FeatureFusion(object):
     def __init__(self, algorithms, class_names, model_layer_sizes = (192, 256, 128), test_model = True):
         self.model_layers_sizes = model_layer_sizes
         self.algorithms = algorithms
+        
+        
         self.number_of_classes = 0
         self.training_data = None
         self.training_labels = None
         self.test_model = test_model
         self.class_names = class_names
     
-    def preprocess_list(self, images_list):
+    def _extract(self, images):
+        for algorithm in self.algorithms:
+            if self.training_data is None:
+                self.training_data = np.array(algorithm(images)).reshape(len(images), -1)
+            else:
+                self.training_data = np.concatenate((self.training_data, np.array(algorithm(images)).reshape(len(images), -1)), axis = 1)
+            
+        
     
-        new_list = []
-        images_list = np.array(images_list)
-        classes_count = images_list.shape[0]
-        images_per_class = images_list.shape[1]
+    def preprocess_list(self, images_list):
+        images = []
         
-        for image in range(images_per_class):
-            for _class in range(classes_count):
-                new_list.append(images_list[_class, image])
+        for _class in images_list:
+            images.extend(_class)
         
-        return new_list
+        return np.array(images)   
     
     
     def extract_features(self, images_list):
         self.number_of_classes = len(images_list)
-        self.images_per_class = len(images_list[0])
-        images_list = np.array(self.preprocess_list(images_list))
         
         self.training_labels = []
-        self.training_labels.extend(list(range(self.number_of_classes)) * self.images_per_class)
+        for i, _class in enumerate(images_list):
+            self.training_labels.extend([i] * len(_class))
+        
+        
+        images_list = self.preprocess_list(images_list)
+        self._extract(images_list)
         self.training_labels = np.array(self.training_labels)
         
-        for key in self.algorithms.keys():
-            f = np.array(self.algorithms[key](images_list)).reshape(images_list.shape[0], -1)
-            
-            if self.training_data is None:
-                self.training_data = f
-            else:
-                self.training_data = np.concatenate((self.training_data, f), axis = 1)
-            
-        
                 
-
-    
-    
     def train(self, epochs = 250):
         layers = [
             Input(shape = (self.training_data.shape[1]))
@@ -94,7 +91,7 @@ class FeatureFusion(object):
         
         
 class ScoreFusion(object):
-    def __init__(self, algorithms, class_names, weights = None, model_layer_sizes = (192, 256, 128), test_model = True):
+    def __init__(self, algorithms, class_names, model_layer_sizes = (192, 256, 128), weights = None,  test_model = True):
         self.model_layer_sizes = model_layer_sizes
         self.algorithms = algorithms
         self.test_model = test_model
@@ -109,28 +106,32 @@ class ScoreFusion(object):
         else:
             self.weights = [1 for _ in self.algorithms.keys()]
     
-    def preprocess_list(self, images_list):
+    def _extract(self, images):
+        for algorithm in self.algorithms:
+            self.training_data.append(np.array(algorithm(images)).reshape(len(images), -1))
+        
     
-        new_list = []
-        images_list = np.array(images_list)
-        classes_count = images_list.shape[0]
-        images_per_class = images_list.shape[1]
+    def preprocess_list(self, images_list):
+        images = []
         
-        for image in range(images_per_class):
-            for _class in range(classes_count):
-                new_list.append(images_list[_class, image])
+        for _class in images_list:
+            images.extend(_class)
         
-        return new_list
+        return np.array(images)
     
     
     def extract_features(self, images_list):
         self.number_of_classes = len(images_list)
-        self.images_per_class = len(images_list[0])
-        images_list = np.array(self.preprocess_list(images_list))
         
-        for key in self.algorithms.keys():
-            self.training_data.append(np.array(self.algorithms[key](images_list)).reshape(images_list.shape[0], -1))
-            self.training_labels.append(np.array(list(range(self.number_of_classes)) * self.images_per_class))
+        for i, _class in enumerate(images_list):
+            self.training_labels.extend([i] * len(_class))
+            
+        images_list = self.preprocess_list(images_list)
+        
+        self._extract(images_list)
+        self.training_labels = np.array(self.training_labels)
+        
+        
         
     
     
@@ -150,12 +151,15 @@ class ScoreFusion(object):
             model.compile(Adam(), 'sparse_categorical_crossentropy', ['accuracy'])
             
             if self.test_model:
-                X_train, X_test, y_train, y_test = train_test_split(self.training_data[i], self.training_labels[i], test_size = 0.25, train_size = 0.75, random_state = 125, shuffle = True)
+                X_train, X_test, y_train, y_test = train_test_split(self.training_data[i], self.training_labels, test_size = 0.25, train_size = 0.75, random_state = 125, shuffle = True)
                 X_tests.append(X_test)
-                y_true = y_test
+                
+                if y_true is None:
+                    y_true = y_test
+                    
                 model.fit(X_train, y_train, epochs = epochs, shuffle = False, use_multiprocessing = True)
             else:
-                model.fit(self.training_data[i], self.training_labels[i], epochs = epochs, shuffle = False, use_multiprocessing = True)
+                model.fit(self.training_data[i], self.training_labels, epochs = epochs, shuffle = False, use_multiprocessing = True)
             
             models.append(model)
         self.models = models

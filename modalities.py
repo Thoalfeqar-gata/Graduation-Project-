@@ -56,7 +56,8 @@ for subject in subjects:
     image_paths = [os.path.join(images_folder, image) for image in os.listdir(images_folder)]
     
     
-    images = []
+    face_images = []
+    modality_images = []
     for image in image_paths:
         img = cv2.imread(image)
         modalities_start = image.find('R')
@@ -110,13 +111,19 @@ for subject in subjects:
         except:
             continue
         
-        images.append(right_eye)
-        images.append(left_eye)
-        images.append(mouth)
-        images.append(nose)
+        img = cv2.resize(img, (224, 224))
+        face_images.append(img)
+        modality_images.append(right_eye)
+        modality_images.append(left_eye)
+        modality_images.append(mouth)
+        modality_images.append(nose)
     
-    images = np.array(images)
-    features = np.array(dnn.predict(images)).reshape(len(images) // 4, -1)
+    modality_images = np.array(modality_images)
+    face_images = np.array(face_images)
+    modality_features = np.array(dnn.predict(modality_images)).reshape(len(modality_images) // 4, -1)
+    face_features = np.array(dnn.predict(face_images)).reshape(len(face_images), -1)
+    features = np.concatenate((face_features, modality_features), axis = 1)
+    
     training_data.extend(features)
     
     if int(subject) in authorised_subjects:

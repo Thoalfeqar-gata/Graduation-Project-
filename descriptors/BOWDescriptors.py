@@ -1,4 +1,4 @@
-import cv2, numpy as np
+import cv2, numpy as np, random
 from tqdm import tqdm
 
 
@@ -13,8 +13,9 @@ def SURFBOWFeatures(images_list):
 
     
     training_fraction = 0.3
-    for i in range(int(len(images_list) * training_fraction)):
-        img = cv2.cvtColor(images_list[i], cv2.COLOR_BGR2GRAY)
+    index = int(len(images_list) * training_fraction)
+    for i in range(index):
+        img = cv2.cvtColor(images_list[random.choice(range(index))], cv2.COLOR_BGR2GRAY)
         _, descriptor = extractor.compute(img, extractor.detect(img))
         
         if descriptor is not None:
@@ -52,8 +53,9 @@ def SIFTBOWFeatures(images_list):
 
     
     training_fraction = 0.3
-    for i in range(int(len(images_list) * training_fraction)):
-        img = cv2.cvtColor(images_list[i], cv2.COLOR_BGR2GRAY)
+    index = int(len(images_list) * training_fraction)
+    for i in range(index):
+        img = cv2.cvtColor(images_list[random.choice(range(index))], cv2.COLOR_BGR2GRAY)
         _, descriptor = extractor.compute(img, extractor.detect(img))
         
         if descriptor is not None:

@@ -25,11 +25,10 @@ from keras.optimizers import Adam
 
 
 number_of_subjects = 15
-authorised_subjects = [2, 10, 20, 22, 37]
+authorised_subjects = [1, 5, 7]
 
 path = os.path.join('data', 'database collage', 'detections', 'all faces with augmentation')
 subjects = [str(i) for i in range(number_of_subjects)]
-subjects.extend(['20', '22', '37'])
 
 print(subjects)
 size = 224
@@ -37,7 +36,8 @@ size = 224
 dnn = VGG16(include_top = False, weights = 'imagenet', input_shape = (size, size, 3))
 for layer in dnn.layers:
     layer.trainable = False
-
+print(dnn.summary())
+input()
 training_data = []
 training_labels = []
 
