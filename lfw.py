@@ -19,11 +19,13 @@ import cv2, numpy as np, os
 image_paths = []
 subjects = []
 size = 100
+
 images_per_subject = 20
 subjects_count = 400
 
 i = 0
 for dir, dirnames, filenames in os.walk('data/lfw/lfw augmented'):
+
     if len(filenames) == 0:
         continue
     
@@ -37,7 +39,7 @@ for dir, dirnames, filenames in os.walk('data/lfw/lfw augmented'):
      
     image_paths.append(person_images)
     subjects.append(os.path.split(dir)[1])
-    
+
     i = i + 1
     if subjects_count is not None:
         if i >= subjects_count:
@@ -46,6 +48,7 @@ for dir, dirnames, filenames in os.walk('data/lfw/lfw augmented'):
 
 
 dnn = VGGFace(False, input_shape = (size, size, 3))
+
 for layer in dnn.layers:
     layer.trainable = False
 
@@ -61,8 +64,8 @@ def hog_features(images):
 def face_embeddings(images):
     features = []
     for i in tqdm(range(len(images))):
+
         embedding = np.array(face_recognition.face_encodings(images[i], num_jitters = 10, model = 'large'))
-        
         
         if embedding.shape == (0,):
             embedding = np.zeros((128,))
@@ -79,6 +82,7 @@ lbp = LocalBinaryPattern(32, 8, (5,5))
 
 DNN = lambda images: np.array(dnn.predict(images, 16)).reshape(len(images), -1)
 
+
 fusion = ScoreFusion([
     face_embeddings,
     DNN
@@ -87,5 +91,7 @@ fusion = ScoreFusion([
 
 fusion.extract_features(image_paths)
 fusion.train(100, 4)
+
+
 
 
