@@ -1,4 +1,4 @@
-import cv2, os, numpy as np, random, time, pickle, joblib
+import cv2, os, numpy as np, random, time, pickle, joblib, random
 import utils, tensorflow as tf, keras, fusion
 from descriptors.BOWDescriptors import SIFTBOWFeatures, SURFBOWFeatures
 from keras.layers import Dense, Input
@@ -6,6 +6,7 @@ from keras.models import Sequential
 from keras.optimizers import Adam
 from keras.metrics import categorical_crossentropy
 from tqdm import tqdm
+from keras_vggface import VGGFace
 from skimage.feature import hog
 from sklearn.metrics import classification_report, roc_curve, auc
 from sklearn.model_selection import train_test_split
@@ -24,35 +25,35 @@ from keras.optimizers import Adam
 
 
 
-number_of_subjects = 15
-authorised_subjects = [1, 5, 7]
+number_of_subjects = 37
+authorised_subjects = [i for i in range(1, number_of_subjects + 1)]
+lbp = LocalBinaryPattern(32, 8, (5, 5))
 
 path = os.path.join('data', 'database collage', 'detections', 'all faces with augmentation')
-subjects = [str(i) for i in range(number_of_subjects)]
+subjects = [str(i) for i in range(1, number_of_subjects + 1)]
 
 print(subjects)
-size = 224
+size = 128
 
-dnn = VGG16(include_top = False, weights = 'imagenet', input_shape = (size, size, 3))
+dnn = VGGFace(include_top = False, input_shape = (size, size, 3))
 for layer in dnn.layers:
     layer.trainable = False
-print(dnn.summary())
-input()
+
 training_data = []
 training_labels = []
 
 def hog_features(images):
     features = []
     for i in tqdm(range(len(images))):
-        f = hog(images[i])
+        f = hog(cv2.cvtColor(images[i], cv2.COLOR_BGR2GRAY))
         features.append(f)
     
     return np.array(features)
 
-i = 1
-for subject in subjects:
+samples_count = 350
+for i, subject in enumerate(subjects):
     images_folder = os.path.join(path, subject)
-    image_paths = [os.path.join(images_folder, image) for image in os.listdir(images_folder)]
+    image_paths = [os.path.join(images_folder, image) for image in os.listdir(images_folder)][:samples_count]
     
     images = []
     for image_path in image_paths:
@@ -60,52 +61,74 @@ for subject in subjects:
         images.append(image)
     
     features = np.array(dnn.predict(np.array(images))).reshape(len(images), -1)
-    
     training_data.extend(features)
-    
-    if int(subject) in authorised_subjects:
-        training_labels.extend([i] * len(features))
-        i = i + 1
-    else:
-        training_labels.extend([0] * len(features))
+    training_labels.extend([i] * len(features))
 
 training_data = np.array(training_data)
 training_labels = np.array(training_labels)
 X_train, X_test, y_train, y_test = train_test_split(training_data, training_labels, test_size = 0.25, train_size = 0.75, shuffle = True, random_state = 250)
 
-model = Sequential([
-    Input(shape = (training_data.shape[1])), 
-    Dense(192, 'relu'),
-    Dense(256, 'relu'),
-    Dense(128, 'relu'),
-    Dense(len(authorised_subjects) + 1, 'softmax')
-])
+model = OneVsRestClassifier(SVC(kernel = 'linear', verbose = True, max_iter = 10000, probability = True), n_jobs = -1)
+model.fit(X_train, y_train)
+y_pred_prob = model.predict_proba(X_test) 
 
-model.compile(Adam(), 'sparse_categorical_crossentropy', ['accuracy'])
-model.fit(X_train, y_train, shuffle = False, use_multiprocessing = True, epochs = 75, verbose = 1)
 
-y_pred_prob = model.predict(X_test) 
-y_bin = label_binarize(y_test, classes = list(range(len(authorised_subjects) + 1)))
-
-line_styles = [':', '-', '--', '-.']
-target_names = ['Subject: Unknown']
-target_names.extend([f'Subject: {subject}' for subject in authorised_subjects])
+target_names = [f'Subject: {subject}' for subject in authorised_subjects]
 print(classification_report(y_test, np.argmax(y_pred_prob, -1), target_names = target_names))
 
-for i in range(len(authorised_subjects) + 1):
-    fpr, tpr, _ = roc_curve(y_bin[:, i], y_pred_prob[:, i])
-    AUC = auc(fpr, tpr)
-    plt.plot(fpr, tpr, lw = 2, color = np.random.rand(3,), linestyle = line_styles[i % len(line_styles)], label = f'ROC curve for {target_names[i]} with AUC = {round(AUC, 5)}')
+genuine_attempts = []
+imposter_attempts = []
+for subject in authorised_subjects:
+    index = subject - 1
+    
+    subject_data = X_test[y_test == index]
+    imposter_data = X_test[y_test != index]
+    
+    
+    y_genuine_probability = model.predict_proba(subject_data)
+    prediction = np.argmax(y_genuine_probability, 1)
+    actual = y_test[y_test == index]
+    y_genuine_probability = y_genuine_probability[prediction == actual]
+    
+    y_imposter_probability = model.predict_proba(imposter_data)[:len(y_genuine_probability)]
+    
+    genuine_score = y_genuine_probability[:, index]
+    genuine_attempts.extend(genuine_score)
 
-plt.ylabel('True Positive Rate')
-plt.xlabel('False Positive Rate')
+    imposter_score = y_imposter_probability[:, index]
+    imposter_attempts.extend(imposter_score)
+    
+    
+
+genuine_attempts = np.array(genuine_attempts) * 100
+imposter_attempts = np.array(imposter_attempts) * 100
+bins = np.array(list(range(0, 100, 1)))
+
+plot_genuine = []
+plot_imposter = []
+
+for i in range(100):
+    count_genuine = 0
+    count_imposter = 0
+    
+    for genuine_attempt in genuine_attempts:
+        if genuine_attempt <= i:
+            count_genuine += 1
+    
+    for imposter_attempt in imposter_attempts:
+        if imposter_attempt >= i:
+            count_imposter += 1
+    
+    plot_genuine.append(count_genuine)
+    plot_imposter.append(count_imposter)
+    
+    
+plt.figure()
+plt.plot(plot_imposter, color = 'red', label = 'FAR')
+plt.plot(plot_genuine, color = 'green', label = 'FRR')
 plt.legend(loc = 'best')
+plt.xlim([0, 100])
 plt.show()
-
-
-joblib.dump(model, 'data/models/test3.joblib')
-model.save_weights('data/models/keras model 1/')
-
 
 
 

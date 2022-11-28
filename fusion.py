@@ -88,7 +88,7 @@ class FeatureFusion(object):
         
         
     def train_svm(self):
-        svm = OneVsRestClassifier(SVC(max_iter = 1000000, verbose = True), n_jobs = -1)
+        svm = OneVsRestClassifier(SVC(kernel = 'linear', max_iter = 1000000, verbose = True), n_jobs = -1)
         
         if self.test_model:
             X_train, X_test, y_train, y_test = train_test_split(self.training_data, self.training_labels, test_size = 0.25, train_size = 0.75, random_state = 250)
