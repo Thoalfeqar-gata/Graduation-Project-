@@ -10,8 +10,6 @@ def SURFBOWFeatures(images_list):
     BOWKmeans = cv2.BOWKMeansTrainer(clusters)
     BOWExtractor = cv2.BOWImgDescriptorExtractor(extractor, matcher)
     
-
-    
     training_fraction = 0.3
     index = int(len(images_list) * training_fraction)
     for i in range(index):
@@ -49,8 +47,6 @@ def SIFTBOWFeatures(images_list):
     matcher = cv2.FlannBasedMatcher(params, {})
     BOWKmeans = cv2.BOWKMeansTrainer(clusters)
     BOWExtractor = cv2.BOWImgDescriptorExtractor(extractor, matcher)
-    
-
     
     training_fraction = 0.3
     index = int(len(images_list) * training_fraction)

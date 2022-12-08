@@ -15,13 +15,12 @@ from descriptors.LocalDescriptors import WeberPattern, LocalBinaryPattern
 import face_recognition
 import cv2, numpy as np, os
 
-
 image_paths = []
 subjects = []
 size = 100
 
 images_per_subject = 45
-subjects_count = None
+subjects_count = 20
 
 i = 0
 for dir, dirnames, filenames in os.walk('data/lfw/lfw augmented'):
@@ -73,8 +72,7 @@ def face_embeddings(images):
             embedding = embedding[0]
         
         features.append(embedding)
-
-            
+        
     return features
 
 weber = WeberPattern((2, 2))
@@ -84,13 +82,10 @@ DNN = lambda images: np.array(dnn.predict(images, 16)).reshape(len(images), -1)
 
 
 fusion = FeatureFusion([
-    face_embeddings
+   DNN,
+   face_embeddings
 ],
-    subjects, image_size = (size, size), batch_size = 5000, roc_title = 'Augmented database', model_layer_sizes = (300, 300, 200))
+    subjects)
 
-fusion.extract_features(image_paths)
-fusion.train_svm()
-
-
-
-
+fusion.extract_features(image_paths, image_size = (size, size))
+fusion.train_svm(flip = False, roc_title = 'Augmented database')

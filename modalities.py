@@ -1,5 +1,5 @@
 import cv2, os, numpy as np, random, time, pickle, joblib, dlib
-import utils, tensorflow as tf, keras, fusion, mediapipe
+import utils, tensorflow as tf, keras, descriptors.fusion as fusion, mediapipe
 from descriptors.BOWDescriptors import SIFTBOWFeatures, SURFBOWFeatures
 from keras.layers import Dense, Input
 from keras.models import Sequential

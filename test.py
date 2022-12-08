@@ -5,7 +5,7 @@ from keras_vggface import VGGFace
 from keras.models import Sequential
 from keras.layers import Dense, Input
 from keras.optimizers import Adam
-from fusion import FeatureFusion, ScoreFusion
+from descriptors.fusion import FeatureFusion, ScoreFusion
 from descriptors.LocalDescriptors import WeberPattern, LocalBinaryPattern
 from skimage.feature import hog
 from descriptors.BOWDescriptors import SIFTBOWFeatures, SURFBOWFeatures
