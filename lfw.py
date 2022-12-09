@@ -20,7 +20,7 @@ subjects = []
 size = 100
 
 images_per_subject = 45
-subjects_count = 20
+subjects_count = 50
 
 i = 0
 for dir, dirnames, filenames in os.walk('data/lfw/lfw augmented'):
@@ -82,10 +82,9 @@ DNN = lambda images: np.array(dnn.predict(images, 16)).reshape(len(images), -1)
 
 
 fusion = FeatureFusion([
-   DNN,
-   face_embeddings
+   hog_features
 ],
     subjects)
 
 fusion.extract_features(image_paths, image_size = (size, size))
-fusion.train_svm(flip = False, roc_title = 'Augmented database')
+fusion.train(100, 32, patience = 15, flip = False, roc_title = 'Augmented database')
