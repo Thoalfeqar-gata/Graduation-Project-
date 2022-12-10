@@ -20,7 +20,7 @@ subjects = []
 size = 100
 
 images_per_subject = 45
-subjects_count = 50
+subjects_count = 20
 
 i = 0
 for dir, dirnames, filenames in os.walk('data/lfw/lfw augmented'):
@@ -37,7 +37,7 @@ for dir, dirnames, filenames in os.walk('data/lfw/lfw augmented'):
             break
      
     image_paths.append(person_images)
-    subjects.append(os.path.split(dir)[1])
+    subjects.append(f'S{i}')
 
     i = i + 1
     if subjects_count is not None:
@@ -87,4 +87,4 @@ fusion = FeatureFusion([
     subjects)
 
 fusion.extract_features(image_paths, image_size = (size, size))
-fusion.train(100, 32, patience = 15, flip = False, roc_title = 'Augmented database')
+fusion.train_svm(flip = False, roc_title = 'Augmented database')

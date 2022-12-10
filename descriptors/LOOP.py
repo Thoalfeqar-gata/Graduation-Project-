@@ -49,7 +49,7 @@ mask[:, :, 7] = [
     [-3, 5, 5]
 ]
 
-@numba.njit
+@numba.njit()
 def loop(image):
     h, w = image.shape
     x = np.zeros(8)

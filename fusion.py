@@ -4,7 +4,7 @@ from keras.losses import categorical_crossentropy
 from keras.optimizers import Adam
 from keras.models import Sequential
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, roc_curve, auc
+from sklearn.metrics import classification_report, roc_curve, auc, confusion_matrix, ConfusionMatrixDisplay
 from sklearn.preprocessing import label_binarize
 from matplotlib import pyplot as plt
 from sklearn.decomposition import PCA
@@ -113,7 +113,7 @@ class Fusion(object):
             condition = (y_test != label)
             for i in range(0, label):
                 condition = np.bitwise_and(condition, y_test != i)
-            imposter_proba = pred_proba[condition]
+            imposter_proba = pred_proba[condition, label]
             
             if len(pred_proba) <= 0:
                 skip_imposter = True
@@ -132,10 +132,14 @@ class Fusion(object):
                     for j in range(len(imposter_proba)):
                         distance = np.sqrt((genuine_proba[i] - imposter_proba[j]) ** 2)
                         imposter_attempts.append(distance)
+            
+            # genuine_attempts.extend(genuine_proba)
+            # imposter_attempts.extend(imposter_proba)
+        
         
         genuine_attempts = np.array(genuine_attempts) * 100
         imposter_attempts = np.array(imposter_attempts) * 100
-        bins = np.array(list(range(0, 100, 1)))
+        bins = np.array(list(range(0, 101, 1)))
         
         genuine_hist, _ = np.histogram(genuine_attempts, bins)
         imposter_hist, _ = np.histogram(imposter_attempts, bins)
@@ -149,7 +153,12 @@ class Fusion(object):
         plt.ylabel('Distribution')
         plt.xlabel('Scores')
         plt.legend(loc = 'best')
-     
+    
+    def confusion_matrix(self, y_pred, y_true, labels):
+        matrix = confusion_matrix(y_true, y_pred)
+        display = ConfusionMatrixDisplay(matrix, display_labels = labels)
+        display.plot()
+        
 
 class FeatureFusion(Fusion):
     def __init__(self, algorithms, class_names):
@@ -208,15 +217,17 @@ class FeatureFusion(Fusion):
             X_train, X_test, y_train, y_test = train_test_split(self.training_data, self.training_labels, test_size = 0.25, train_size = 0.75, random_state = 250)
             svm.fit(X_train, y_train)
             y_pred_prob = np.array(svm.decision_function(X_test)) 
+            y_pred = np.argmax(y_pred_prob, -1)
             y_bin = label_binarize(y_test, classes = list(range(self.number_of_classes)))
 
-            line_styles = [':', '-', '--', '-.']
             print('Feature fusion:')                    
-            print(classification_report(y_test, np.argmax(y_pred_prob, -1), target_names = self.class_names, labels = np.unique(self.training_labels)))
+            print(classification_report(y_test, y_pred, target_names = self.class_names, labels = np.unique(self.training_labels)))
             self.FAR_FRR(X_test, y_test, svm.predict_proba, flip = flip)
             self.genuine_vs_imposter(X_test, y_test, svm.predict_proba)
-            
+            self.confusion_matrix(y_pred, y_test, labels = self.class_names)
+
             plt.figure('ROC curve')
+            line_styles = [':', '-', '--', '-.']
             if(separate_subjects):
                 for i in range(self.number_of_classes):
                     fpr, tpr, _ = roc_curve(y_bin[:, i], y_pred_prob[:, i])
@@ -257,17 +268,19 @@ class FeatureFusion(Fusion):
             X_train, X_test, y_train, y_test = train_test_split(self.training_data, self.training_labels, test_size = 0.25, train_size = 0.75, random_state = 250)
             model.fit(X_train, y_train, batch_size = batch_size, epochs = epochs, shuffle = False, use_multiprocessing = True, validation_split = 0.1, callbacks = [callback])
             y_pred_prob = np.array(model.predict(X_test)) 
+            y_pred = np.argmax(y_pred_prob, -1)
             y_bin = label_binarize(y_test, classes = list(range(self.number_of_classes)))
 
-            line_styles = [':', '-', '--', '-.']
             print('Feature fusion:')                    
-            print(classification_report(y_test, np.argmax(y_pred_prob, -1), target_names = self.class_names, labels = np.unique(self.training_labels)))
+            print(classification_report(y_test, y_pred, target_names = self.class_names, labels = np.unique(self.training_labels)))
             
             predict = lambda x: model.predict(x, verbose = 0)
             self.FAR_FRR(X_test, y_test, predict, flip)
             self.genuine_vs_imposter(X_test, y_test, predict)
+            self.confusion_matrix(y_pred, y_test, labels = self.class_names)
             
             plt.figure('ROC curve')
+            line_styles = [':', '-', '--', '-.']
             if(separate_subjects):
                 for i in range(self.number_of_classes):
                     fpr, tpr, _ = roc_curve(y_bin[:, i], y_pred_prob[:, i])
@@ -369,13 +382,14 @@ class ScoreFusion(Fusion):
             y_bin = label_binarize(y_true, classes = list(range(self.number_of_classes)))
             y_pred = np.argmax(y_pred_prob, -1)
             
-            line_styles = [':', '-', '--', '-.']
             print('Score fusion:')
             print(classification_report(y_true, y_pred, target_names = self.class_names, labels = np.unique(self.training_labels)))
             self.FAR_FRR(X_tests, y_test, self.vote_svm, flip)
             self.genuine_vs_imposter(X_tests, y_test, self.vote_svm)
-            
+            self.confusion_matrix(y_pred, y_test, labels = self.class_names)
+
             plt.figure('ROC curve')
+            line_styles = [':', '-', '--', '-.']
             if(separate_subjects):
                 for i in range(self.number_of_classes):
                     fpr, tpr, _ = roc_curve(y_bin[:, i], y_pred_prob[:, i])
@@ -431,13 +445,14 @@ class ScoreFusion(Fusion):
             y_bin = label_binarize(y_true, classes = list(range(self.number_of_classes)))
             y_pred = np.argmax(y_pred_prob, -1)
             
-            line_styles = [':', '-', '--', '-.']
             print('Score fusion:')
             print(classification_report(y_true, y_pred, target_names = self.class_names, labels = np.unique(self.training_labels)))
             self.FAR_FRR(X_tests, y_test, self.vote, flip)
             self.genuine_vs_imposter(X_tests, y_test, self.vote)
-            
+            self.confusion_matrix(np.argmax(y_pred_prob, -1), y_test, labels = self.class_names)
+
             plt.figure('ROC Curve')
+            line_styles = [':', '-', '--', '-.']
             if(separate_subjects):
                 for i in range(self.number_of_classes):
                     fpr, tpr, _ = roc_curve(y_bin[:, i], y_pred_prob[:, i])
@@ -454,7 +469,6 @@ class ScoreFusion(Fusion):
             plt.show()
 
         return models
-
 
 
     def vote_svm(self, samples_per_model):
