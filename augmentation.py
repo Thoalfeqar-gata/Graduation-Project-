@@ -4,36 +4,34 @@ from tqdm import tqdm
 transform = A.Compose([
     A.HorizontalFlip(p = 0.5),
     A.RandomBrightnessContrast(p = 0.5),
-    A.CLAHE(p = 0.5),
     A.RandomGamma(p = 0.5),
-    A.ShiftScaleRotate(p = 0.5, rotate_limit = 15),
     A.GaussianBlur(blur_limit = (3, 3), p = 0.5),
     A.GaussNoise((5, 25), p = 0.5),
     A.Sharpen(p = 0.5),
-    A.Emboss(p = 0.5)
+    A.Emboss(p = 0.5),
 ])
 
-path = os.path.join('data', 'lfw_funneled')
-
-
-
-images_per_subject = 50
+path = os.path.join('data', 'database collage', 'detections', 'DB unified', 'all faces')
+output_path = os.path.join('data', 'database collage', 'detections', 'DB unified', 'all faces with augmentation')
+images_per_subject = 200
 subjects = os.listdir(path)
 
 for index in tqdm(range(len(subjects))):
     subject = subjects[index]
     images = os.listdir(os.path.join(path, subject))
-    
+    if not os.path.exists(os.path.join(output_path, subject)):
+        os.mkdir(os.path.join(output_path, subject))
+        
     if len(images) < images_per_subject:
         images_to_generate = images_per_subject - len(images)
         
         generated_images = []
-        
+        names = []
         while len(generated_images) <= images_to_generate:
             for image in images:
                 img_path = os.path.join(path, subject, image)
-                img = cv2.imread(img_path)[13:250-13, 13:250-13]
-                
+                names.append(image)
+                img = cv2.imread(img_path)
                 new_img = transform(image = img)['image']
                 
                 if np.all(new_img == img):
@@ -43,11 +41,12 @@ for index in tqdm(range(len(subjects))):
                         continue
                 
                 generated_images.append(new_img)
-    
-        for  i in range(len(generated_images)):
-            output_path = os.path.join('data', 'lfw augmented', subject, f'AUG_{i}.jpg')
-            cv2.imwrite(output_path, generated_images[i])
-            
+                
+        for i in range(len(generated_images)):
+            image_output_path = os.path.join(output_path, subject, f'AUG_{i}_{names[i]}')
+            cv2.imwrite(image_output_path, generated_images[i])
         
-          
-        
+        for i in range(len(images)):
+            image_output_path = os.path.join(output_path, subject, names[i])
+            image = cv2.imread(os.path.join(path, subject, names[i]))
+            cv2.imwrite(image_output_path, image)

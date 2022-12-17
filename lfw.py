@@ -14,6 +14,7 @@ from skimage.feature import hog
 from descriptors.LocalDescriptors import WeberPattern, LocalBinaryPattern
 import face_recognition
 import cv2, numpy as np, os
+from deepface import DeepFace
 
 image_paths = []
 subjects = []
@@ -51,6 +52,14 @@ dnn = VGGFace(False, input_shape = (size, size, 3))
 for layer in dnn.layers:
     layer.trainable = False
 
+def deepface_features(images):
+    features = []
+    for i in tqdm(range(len(images))):
+        f = DeepFace.represent(images[i], 'Dlib', detector_backend = 'opencv', enforce_detection = False)
+        features.append(f)
+    return features
+        
+        
 def hog_features(images):
     features = []
     for i in tqdm(range(len(images))):
@@ -82,9 +91,9 @@ DNN = lambda images: np.array(dnn.predict(images, 16)).reshape(len(images), -1)
 
 
 fusion = FeatureFusion([
-   hog_features
+   deepface_features
 ],
     subjects)
 
 fusion.extract_features(image_paths, image_size = (size, size))
-fusion.train_svm(flip = False, roc_title = 'Augmented database')
+fusion.train(50, 4, flip = False, roc_title = 'Augmented database')

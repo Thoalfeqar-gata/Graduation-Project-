@@ -30,7 +30,29 @@ class Fusion(object):
         
         return np.array(images)
     
-    
+    def ROC_curve(self, y_bin, y_pred_prob, separate_subjects, roc_title):
+        plt.figure('ROC curve')
+        line_styles = [':', '-', '--', '-.']
+        if(separate_subjects):
+            for i in range(self.number_of_classes):
+                fpr, tpr, _ = roc_curve(y_bin[:, i], y_pred_prob[:, i])
+                AUC = auc(fpr, tpr)
+                plt.plot(fpr, tpr, lw = 2, color = np.random.rand(3,), linestyle = line_styles[i % len(line_styles)], label = f'ROC curve for {self.class_names[i]} with AUC = {round(AUC, 5)}')
+        else:
+            fpr, tpr, threshold = roc_curve(y_bin.ravel(), y_pred_prob.ravel())
+            AUC = auc(fpr, tpr)
+            fnr = 1 - tpr
+            index = np.argmin(np.abs((fnr - fpr)))
+            EER = np.mean((fnr[index], fpr[index]))
+            plt.plot(fpr, tpr, lw = 2, color = 'red', label = f'ROC curve for {self.number_of_classes} individuals with AUC = {round(AUC, 5)}')
+            plt.plot(EER, 1 - EER, 'bo', label = f'EER = {EER}')
+            plt.plot([1, 0], [0, 1], linestyle = '--')
+            
+        plt.title(roc_title)
+        plt.ylabel('True Positive Rate')
+        plt.xlabel('False Positive Rate')
+        plt.legend(loc = 'lower right')
+
     def FAR_FRR(self, X_test, y_test, model, flip = True):
         genuine_attempts = []
         imposter_attempts = []
@@ -225,23 +247,7 @@ class FeatureFusion(Fusion):
             self.FAR_FRR(X_test, y_test, svm.predict_proba, flip = flip)
             self.genuine_vs_imposter(X_test, y_test, svm.predict_proba)
             self.confusion_matrix(y_pred, y_test, labels = self.class_names)
-
-            plt.figure('ROC curve')
-            line_styles = [':', '-', '--', '-.']
-            if(separate_subjects):
-                for i in range(self.number_of_classes):
-                    fpr, tpr, _ = roc_curve(y_bin[:, i], y_pred_prob[:, i])
-                    AUC = auc(fpr, tpr)
-                    plt.plot(fpr, tpr, lw = 2, color = np.random.rand(3,), linestyle = line_styles[i % len(line_styles)], label = f'ROC curve for {self.class_names[i]} with AUC = {round(AUC, 5)}')
-            else:
-                fpr, tpr, _ = roc_curve(y_bin.ravel(), y_pred_prob.ravel())
-                AUC = auc(fpr, tpr)
-                plt.plot(fpr, tpr, lw = 2, color = 'red', label = f'ROC curve for {self.number_of_classes} individuals with AUC = {round(AUC, 5)}')
-
-            plt.title(roc_title)
-            plt.ylabel('True Positive Rate')
-            plt.xlabel('False Positive Rate')
-            plt.legend(loc = 'best')
+            self.ROC_curve(y_bin, y_pred_prob, separate_subjects, roc_title)
             plt.show()
         else:
             svm.fit(X_train, y_train)
@@ -278,23 +284,7 @@ class FeatureFusion(Fusion):
             self.FAR_FRR(X_test, y_test, predict, flip)
             self.genuine_vs_imposter(X_test, y_test, predict)
             self.confusion_matrix(y_pred, y_test, labels = self.class_names)
-            
-            plt.figure('ROC curve')
-            line_styles = [':', '-', '--', '-.']
-            if(separate_subjects):
-                for i in range(self.number_of_classes):
-                    fpr, tpr, _ = roc_curve(y_bin[:, i], y_pred_prob[:, i])
-                    AUC = auc(fpr, tpr)
-                    plt.plot(fpr, tpr, lw = 2, color = np.random.rand(3,), linestyle = line_styles[i % len(line_styles)], label = f'ROC curve for {self.class_names[i]} with AUC = {round(AUC, 5)}')
-            else:
-                fpr, tpr, _ = roc_curve(y_bin.ravel(), y_pred_prob.ravel())
-                AUC = auc(fpr, tpr)
-                plt.plot(fpr, tpr, lw = 2, color = 'red', label = f'ROC curve for {self.number_of_classes} individuals with AUC = {round(AUC, 5)}')
-                
-            plt.title(roc_title)
-            plt.ylabel('True Positive Rate')
-            plt.xlabel('False Positive Rate')
-            plt.legend(loc = 'best')
+            self.ROC_curve(y_bin, y_pred_prob, separate_subjects, roc_title)
             plt.show()
         else:
             model.fit(self.training_data, self.training_labels, batch_size = batch_size, epochs = epochs, shuffle = False, validation_split = 0.1, callbacks = [callback])
@@ -387,25 +377,8 @@ class ScoreFusion(Fusion):
             self.FAR_FRR(X_tests, y_test, self.vote_svm, flip)
             self.genuine_vs_imposter(X_tests, y_test, self.vote_svm)
             self.confusion_matrix(y_pred, y_test, labels = self.class_names)
-
-            plt.figure('ROC curve')
-            line_styles = [':', '-', '--', '-.']
-            if(separate_subjects):
-                for i in range(self.number_of_classes):
-                    fpr, tpr, _ = roc_curve(y_bin[:, i], y_pred_prob[:, i])
-                    AUC = auc(fpr, tpr)
-                    plt.plot(fpr, tpr, lw = 2, color = np.random.rand(3,), linestyle = line_styles[i % len(line_styles)], label = f'ROC curve for {self.class_names[i]} with AUC = {round(AUC, 5)}')
-            else:
-                fpr, tpr, _ = roc_curve(y_bin.ravel(), y_pred_prob.ravel())
-                AUC = auc(fpr, tpr)
-                plt.plot(fpr, tpr, lw = 2, color = 'red', label = f'ROC curve for {self.number_of_classes} individuals with AUC = {round(AUC, 5)}')
-            
-            plt.title(roc_title)
-            plt.ylabel('True Positive Rate')
-            plt.xlabel('False Positive Rate')
-            plt.legend(loc = 'best')
+            self.ROC_curve(y_bin, y_pred_prob, separate_subjects, roc_title)
             plt.show()
-
         return models
     
     
@@ -450,22 +423,7 @@ class ScoreFusion(Fusion):
             self.FAR_FRR(X_tests, y_test, self.vote, flip)
             self.genuine_vs_imposter(X_tests, y_test, self.vote)
             self.confusion_matrix(np.argmax(y_pred_prob, -1), y_test, labels = self.class_names)
-
-            plt.figure('ROC Curve')
-            line_styles = [':', '-', '--', '-.']
-            if(separate_subjects):
-                for i in range(self.number_of_classes):
-                    fpr, tpr, _ = roc_curve(y_bin[:, i], y_pred_prob[:, i])
-                    AUC = auc(fpr, tpr)
-                    plt.plot(fpr, tpr, lw = 2, color = np.random.rand(3,), linestyle = line_styles[i % len(line_styles)], label = f'ROC curve for {self.class_names[i]} with AUC = {round(AUC, 5)}')
-            else:
-                fpr, tpr, _ = roc_curve(y_bin.ravel(), y_pred_prob.ravel())
-                AUC = auc(fpr, tpr)
-                plt.plot(fpr, tpr, lw = 2, color = 'red', label = f'ROC curve for {self.number_of_classes} individuals with AUC = {round(AUC, 5)}')
-            plt.title(roc_title)
-            plt.ylabel('True Positive Rate')
-            plt.xlabel('False Positive Rate')
-            plt.legend(loc = 'best')
+            self.ROC_curve(y_bin, y_pred_prob, separate_subjects, roc_title)
             plt.show()
 
         return models
