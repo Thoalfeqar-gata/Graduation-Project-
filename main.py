@@ -28,7 +28,7 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from fusion import FeatureFusion, ScoreFusion
 
 path = 'data/database collage/detections/DB unified/all faces with augmentation'
-size = 128
+size = 100
 
 image_paths = []
 subjects = [f'S{i}' for i in range(len(os.listdir(path)))]
@@ -38,7 +38,7 @@ for dirname, dirnames, filenames in os.walk(path):
     if len(filenames) <= 0:
         continue
     
-    subject_images = [os.path.join(dirname, filename) for filename in filenames][:images_per_subject]
+    subject_images = [os.path.join(dirname, filename) for filename in filenames]
     image_paths.append(subject_images)
 
 
@@ -82,10 +82,10 @@ def face_embeddings(images):
 weber = WeberPattern((2, 2))
 lbp = LocalBinaryPattern(32, 8, (5,5))
 
-fusion = ScoreFusion([
-   deepface_features
+fusion = FeatureFusion([
+   DNN
 ],
     subjects)
 
 fusion.extract_features(image_paths, image_size = (size, size))
-fusion.train(100, 16, patience = 30, flip = False, roc_title = 'Augmented database')
+fusion.train_svm(flip = False, roc_title = 'Augmented database')

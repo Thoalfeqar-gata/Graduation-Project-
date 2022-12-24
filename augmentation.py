@@ -6,9 +6,10 @@ transform = A.Compose([
     A.RandomBrightnessContrast(p = 0.5),
     A.RandomGamma(p = 0.5),
     A.GaussianBlur(blur_limit = (3, 3), p = 0.5),
-    A.GaussNoise((5, 25), p = 0.5),
-    A.Sharpen(p = 0.5),
     A.Emboss(p = 0.5),
+    A.CLAHE(),
+    A.ChannelShuffle(),
+    A.ColorJitter(0.1, 0.1, 0.1, 0.1)
 ])
 
 path = os.path.join('data', 'database collage', 'detections', 'DB unified', 'all faces')
