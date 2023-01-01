@@ -250,7 +250,7 @@ class FeatureFusion(Fusion):
             self.ROC_curve(y_bin, y_pred_prob, separate_subjects, roc_title)
             plt.show()
         else:
-            svm.fit(X_train, y_train)
+            svm.fit(self.training_data, self.training_labels)
 
         return svm
 

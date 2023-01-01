@@ -33,7 +33,6 @@ size = 100
 image_paths = []
 subjects = [f'S{i}' for i in range(len(os.listdir(path)))]
 print(subjects)
-images_per_subject = 20
 for dirname, dirnames, filenames in os.walk(path):
     if len(filenames) <= 0:
         continue
@@ -80,7 +79,7 @@ def face_embeddings(images):
     return features
 
 weber = WeberPattern((2, 2))
-lbp = LocalBinaryPattern(32, 8, (5,5))
+lbp = LocalBinaryPattern(20, 3, (7,7))
 
 fusion = FeatureFusion([
    DNN
@@ -88,4 +87,5 @@ fusion = FeatureFusion([
     subjects)
 
 fusion.extract_features(image_paths, image_size = (size, size))
-fusion.train_svm(flip = False, roc_title = 'Augmented database')
+model = fusion.train_svm(flip = False, roc_title = 'Augmented database')
+# pickle.dump(model, open('data/models/database collage svm with vggface/model.sav', 'wb'))

@@ -426,31 +426,34 @@ def extract_faces_from_database(images_path, output_path, face_detection_confide
     facenet = FaceNet()
 
     for i in tqdm(range(len(image_paths))):
-        img = cv2.imread(image_paths[i])
+        img = cv2.resize(cv2.imread(image_paths[i]), (480, 640))
         lighting_condition = seperate_dim_lit(img)
         
         boxes = face_recognition.face_locations(img, 1, model = 'cnn')
         if len(boxes) <= 0:
             continue
         top, right, bottom, left = boxes[0]
-        encodings = facenet.embeddings([img[top : bottom, left : right] for top, right, bottom, left in boxes])
-        
+        # encodings = facenet.embeddings([img[top : bottom, left : right] for top, right, bottom, left in boxes])
+        encodings = face_recognition.face_encodings(img, boxes, num_jitters = 3, model = 'large')
         data = [{'encoding' : encoding, 'location' : box, 'image path' : image_paths[i], 'lighting condition' : lighting_condition} for encoding, box in zip(encodings, boxes)]
         detection_data.extend(data)
     
     encodings = [data['encoding'] for data in detection_data]
+    print('Found this many encodings:', len(encodings))
     clt = SpectralClustering(n_clusters = 20, n_jobs = -1)
     clt.fit(encodings)
     
     padding = 10
     labelIDs = np.unique(clt.labels_)
+    print(labelIDs)
     for labelID in labelIDs:
         indexes = np.where(clt.labels_ == labelID)[0]
-            
+        print('hi')
         if not os.path.isdir(os.path.join(output_path, str(labelID))):
             os.mkdir(os.path.join(output_path, str(labelID)))
         
         faces = []
+        print(indexes)
         for i in indexes:
             face = cv2.imread(detection_data[i]['image path'])
             h,w = face.shape[:2]

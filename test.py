@@ -1,88 +1,46 @@
-import cv2, joblib, numpy as np, time, face_recognition, os, multiprocessing as mp
-from tqdm import tqdm
-from keras.applications.vgg16 import VGG16
+import os, utils, pickle, face_recognition, cv2, numpy as np
 from keras_vggface import VGGFace
-from keras.models import Sequential
-from keras.layers import Dense, Input
-from keras.optimizers import Adam
-from descriptors.fusion import FeatureFusion, ScoreFusion
-from descriptors.LocalDescriptors import WeberPattern, LocalBinaryPattern
-from skimage.feature import hog
-from descriptors.BOWDescriptors import SIFTBOWFeatures, SURFBOWFeatures
-from descriptors.GIST import GIST
+from tqdm import tqdm
+from keras.applications.mobilenet_v2 import MobileNetV2
+from keras.layers import Dense, Flatten
+from keras.models import Sequential, Model
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+from keras.callbacks import EarlyStopping
 
-size = 70
-weber = WeberPattern((2, 2))
-lbp = LocalBinaryPattern(32, 3, (6,6))
-
+size = 100
+path = 'data/database collage/detections/DB unified/all faces with augmentation'
+subjects_num = len(os.listdir(path))
+training_data = []
+training_labels = []
+target_names = []
+i = 0
+for dirname, dirnames, filenames in os.walk(path):
+    if len(filenames) <= 0:
+        continue
+    print(i)
+    target_names.append(f'S{i}')
+    for filename in filenames:
+        image = cv2.cvtColor(cv2.resize(cv2.imread(os.path.join(dirname, filename)), (size, size)), cv2.COLOR_BGR2RGB)
+        training_data.append(image)
+        training_labels.append(i)
+    i += 1
     
-dnn = VGGFace(include_top = False, input_shape = (size, size, 3))
-for layer in dnn.layers:
-    layer.trainable = False
-    
-DNN = lambda images: np.array(dnn.predict(images, 16, use_multiprocessing = True)).reshape(len(images), -1)
+training_data = np.array(training_data)
+training_labels = np.array(training_labels)
+X_train, X_test, y_train, y_test = train_test_split(training_data, training_labels, test_size = 0.25, train_size = 0.75, random_state = 200)
 
-def hog_features(images):
-    print('Processing hog features...')
-    features = []
-    for i in tqdm(range(len(images))):
-        image = cv2.cvtColor(images[i], cv2.COLOR_BGR2GRAY)
-        f = hog(image, 10, (8, 8))
-        features.append(f)
-    
-    return features
+model = MobileNetV2(include_top = False, input_shape = (size, size, 3), weights = 'imagenet')
+x = Flatten()(model.layers[-1].output)
+x = Dense(384, 'relu')(x)
+x = Dense(384, 'relu')(x)
+x = Dense(384, 'relu')(x)
+x = Dense(subjects_num, 'softmax')(x)
+model = Model(inputs = model.input, outputs = [x])
+model.compile('adam', 'sparse_categorical_crossentropy', ['accuracy'])
+callback = EarlyStopping(patience = 50, verbose = 1, restore_best_weights = True, monitor = 'val_accuracy')
 
-
-def face_embeddings(images):
-    features = []
-    for i in tqdm(range(len(images))):
-        embedding = np.array(face_recognition.face_encodings(images[i], num_jitters = 1, model = 'large'))
-        
-        
-        if embedding.shape == (0,):
-            embedding = np.zeros((128,))
-        else:
-            embedding = embedding[0]
-        
-        features.append(embedding)
-
-            
-    return features
-
-
-number_of_subjects = 37
-authorised_subjects = [i for i in range(1, number_of_subjects + 1)]
-
-path = os.path.join('data', 'database collage', 'detections', 'all faces with augmentation')
-subjects = [i for i in range(1, number_of_subjects + 1)]
-print(subjects)
-print(len(subjects))
-
-images_list = []
-unauthorised_list = []
-
-for subject in subjects:
-    images_folder = os.path.join(path, str(subject))
-    image_paths = [os.path.join(images_folder, image) for image in os.listdir(images_folder)]  
-    
-    if subject in authorised_subjects:
-        images_list.append(image_paths)
-    else:
-        unauthorised_list.extend(image_paths)
-
-if len(unauthorised_list) > 0:
-    images_list.append(unauthorised_list)
-
-
-class_names = [f'Subject: {i}' for i in authorised_subjects]
-
-
-fusion = FeatureFusion([
-    weber.compute,
-    hog_features
-], 
-   class_names, image_size = (size, size))
-
-fusion.extract_features(images_list)
-del images_list
-fusion.train_svm()
+model.fit(X_train, y_train, 32, 250, validation_split = 0.1, shuffle = False, callbacks = [callback])
+prediction_probability = model.predict(X_test)
+prediction = np.argmax(prediction_probability, -1)
+print(classification_report(y_test, prediction, target_names = target_names))
