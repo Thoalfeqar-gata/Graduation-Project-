@@ -12,9 +12,9 @@ transform = A.Compose([
     A.ColorJitter(0.1, 0.1, 0.1, 0.1)
 ])
 
-path = os.path.join('data', 'database collage', 'detections', 'DB unified', 'all faces')
-output_path = os.path.join('data', 'database collage', 'detections', 'DB unified', 'all faces with augmentation')
-images_per_subject = 200
+path = os.path.join('data', 'database collage', 'detections', 'DB unified', 'all modalities')
+output_path = os.path.join('data', 'database collage', 'detections', 'DB unified', 'all modalities with augmentation')
+images_per_subject = 800
 subjects = os.listdir(path)
 
 for index in tqdm(range(len(subjects))):

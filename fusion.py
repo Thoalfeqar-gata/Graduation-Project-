@@ -399,7 +399,7 @@ class ScoreFusion(Fusion):
             callback = EarlyStopping(patience = patience, verbose = 1, restore_best_weights = True)
 
             if test_model:
-                X_train, X_test, y_train, y_test = train_test_split(self.training_data[i], self.training_labels, test_size = 0.25, train_size = 0.75, random_state = 125, shuffle = True)
+                X_train, X_test, y_train, y_test = train_test_split(self.training_data[i], self.training_labels, test_size = 0.25, train_size = 0.75, random_state = 250, shuffle = True)
                 X_tests.append(X_test)
                 
                 if y_true is None:

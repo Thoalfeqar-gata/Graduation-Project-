@@ -1,48 +1,37 @@
-import cv2, os, numpy as np, random, time, pickle, joblib, random, face_recognition
-import utils, tensorflow as tf, keras, fusion
+import cv2, os, numpy as np, random, face_recognition
 from descriptors.BOWDescriptors import SIFTBOWFeatures, SURFBOWFeatures
-from keras.layers import Dense, Input
-from keras.models import Sequential
-from keras.optimizers import Adam
-from keras.metrics import categorical_crossentropy
 from tqdm import tqdm
 from keras_vggface import VGGFace
+from keras.applications import vgg16, vgg19, ResNet50
 from deepface import DeepFace
 from skimage.feature import hog
-from sklearn.metrics import classification_report, roc_curve, auc
-from sklearn.model_selection import train_test_split
-from sklearn.neural_network import MLPClassifier
-from sklearn.multiclass import OneVsRestClassifier
-from sklearn.svm import SVC
 from descriptors.LocalDescriptors import WeberPattern, LocalBinaryPattern
-from matplotlib import pyplot as plt
-from sklearn.preprocessing import label_binarize
-from keras.applications.vgg16 import VGG16, preprocess_input
-from keras.utils import to_categorical
 from descriptors.GIST import GIST
-from keras.models import Sequential
-from keras.layers import Dense, Input
-from keras.optimizers import Adam
-from scipy.spatial.distance import hamming, euclidean, cosine, cityblock, minkowski, canberra, correlation, mahalanobis, dice 
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from fusion import FeatureFusion, ScoreFusion
 
+param = {
+    'orientationsPerScale' : np.array([8, 8, 8, 8]),
+    'boundaryExtension' : 1,
+    'numberBlocks' : [4, 4],
+    'fc_prefilt' : 10
+}
+gist = GIST(param)
 path = 'data/database collage/detections/DB unified/all faces with augmentation'
 size = 100
 
-image_paths = []
+faces_paths = []
 subjects = [f'S{i}' for i in range(len(os.listdir(path)))]
 print(subjects)
+total_images = 0
 for dirname, dirnames, filenames in os.walk(path):
     if len(filenames) <= 0:
         continue
-    
     subject_images = [os.path.join(dirname, filename) for filename in filenames]
-    image_paths.append(subject_images)
-
+    faces_paths.append(subject_images)
+    total_images += len(subject_images)
 
     
-dnn = VGGFace(False, input_shape = (size, size, 3))
+dnn = ResNet50(False, input_shape = (size, size, 3))
 for layer in dnn.layers:
     layer.trainable = False
 DNN = lambda images: np.array(dnn.predict(images, 16)).reshape(len(images), -1)
@@ -50,7 +39,7 @@ DNN = lambda images: np.array(dnn.predict(images, 16)).reshape(len(images), -1)
 def deepface_features(images):
     features = []
     for i in tqdm(range(len(images))):
-        f = DeepFace.represent(images[i], 'DeepFace', detector_backend = 'opencv', enforce_detection = False)
+        f = DeepFace.represent(images[i], 'Facenet', detector_backend = 'dlib', enforce_detection = False)
         features.append(f)
     return features
         
@@ -62,6 +51,15 @@ def hog_features(images):
         f = hog(image, 10, (8, 8))
         features.append(f)
     
+    return features
+
+def gist_features(images):
+    features = []
+    print('Processing gist features...')
+    for i in tqdm(range(len(images))):
+        image = cv2.cvtColor(images[i], cv2.COLOR_BGR2GRAY)
+        f = gist._gist_extract(image)
+        features.append(f)
     return features
 
 def face_embeddings(images):
@@ -78,14 +76,13 @@ def face_embeddings(images):
         
     return features
 
-weber = WeberPattern((2, 2))
+weber = WeberPattern((4, 4))
 lbp = LocalBinaryPattern(20, 3, (7,7))
 
 fusion = FeatureFusion([
-   DNN
+    DNN
 ],
     subjects)
-
-fusion.extract_features(image_paths, image_size = (size, size))
-model = fusion.train_svm(flip = False, roc_title = 'Augmented database')
-# pickle.dump(model, open('data/models/database collage svm with vggface/model.sav', 'wb'))
+print(total_images)
+fusion.extract_features(faces_paths,batch_size = total_images, image_size = (size, size))
+model = fusion.train(100, 32, patience = 30, flip = False, roc_title = 'ResNet50')

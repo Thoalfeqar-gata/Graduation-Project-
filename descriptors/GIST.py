@@ -1,4 +1,4 @@
-import numpy as np
+import numpy as np, cv2
 import numpy.matlib as nm
 import numpy.fft as f
 from PIL import Image
@@ -28,7 +28,7 @@ class GIST():
             tr = t + gabor_param[i,3]
             tr+= 2*np.pi*(tr < -np.pi) - 2 * np.pi*(tr>np.pi)
             G[:,:,i] = np.exp(-10*gabor_param[i,0]*(fr/n[1]/gabor_param[i,1]-1)**2-2*gabor_param[i,2]*np.pi*tr**2)
-
+        
         return G
 
     def _more_config(self,img):

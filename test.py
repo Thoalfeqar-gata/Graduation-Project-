@@ -2,6 +2,7 @@ import os, utils, pickle, face_recognition, cv2, numpy as np
 from keras_vggface import VGGFace
 from tqdm import tqdm
 from keras.applications.mobilenet_v2 import MobileNetV2
+from keras.applications.vgg16 import VGG16
 from keras.layers import Dense, Flatten
 from keras.models import Sequential, Model
 from sklearn.model_selection import train_test_split
@@ -30,7 +31,7 @@ training_data = np.array(training_data)
 training_labels = np.array(training_labels)
 X_train, X_test, y_train, y_test = train_test_split(training_data, training_labels, test_size = 0.25, train_size = 0.75, random_state = 200)
 
-model = MobileNetV2(include_top = False, input_shape = (size, size, 3), weights = 'imagenet')
+model = VGG16(include_top = False, input_shape = (size, size, 3), weights = 'imagenet')
 x = Flatten()(model.layers[-1].output)
 x = Dense(384, 'relu')(x)
 x = Dense(384, 'relu')(x)

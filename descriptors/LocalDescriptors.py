@@ -1,7 +1,7 @@
 import numpy as np, cv2
 from tqdm import tqdm
 from skimage.feature import local_binary_pattern
-from descriptors.weber import weber
+from descriptors.weber2 import weber
 
 class LocalPattern:
     def __init__(self, grid_shape = (6, 6)):
@@ -58,7 +58,10 @@ class WeberPattern(LocalPattern):
         print('Processing weber features...')
         for i in tqdm(range(len(images))):
             image = cv2.cvtColor(images[i], cv2.COLOR_BGR2GRAY)
-            slices = self.preprocess(image)
+            if self.grid_shape == (1, 1):
+                slices = [image]
+            else:
+                slices = self.preprocess(image)
             result = []
         
             for  i in range(len(slices)):
