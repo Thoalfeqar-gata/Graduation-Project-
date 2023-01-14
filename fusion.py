@@ -12,12 +12,13 @@ from tqdm import tqdm
 from sklearn.svm import SVC
 from sklearn.multiclass import OneVsRestClassifier
 from keras.callbacks import EarlyStopping
+from sklearn.metrics import f1_score, precision_score, recall_score
 
 class Fusion(object):
     def __init__(self, algorithms, class_names):
         self.algorithms = algorithms
         self.class_names = class_names
-        self.number_of_classes = 0
+        self.number_of_classes = len(class_names)
         self.training_data = []
         self.training_labels = []
         
@@ -31,27 +32,33 @@ class Fusion(object):
         return np.array(images)
     
     def ROC_curve(self, y_bin, y_pred_prob, separate_subjects, roc_title):
-        plt.figure('ROC curve')
+        figure = plt.figure('ROC curve')
+        figure.set_figwidth(6.4)
+        figure.set_figheight(4.8)
         line_styles = [':', '-', '--', '-.']
+        
         if(separate_subjects):
             for i in range(self.number_of_classes):
                 fpr, tpr, _ = roc_curve(y_bin[:, i], y_pred_prob[:, i])
                 AUC = auc(fpr, tpr)
                 plt.plot(fpr, tpr, lw = 2, color = np.random.rand(3,), linestyle = line_styles[i % len(line_styles)], label = f'ROC curve for {self.class_names[i]} with AUC = {round(AUC, 5)}')
-        else:
-            fpr, tpr, threshold = roc_curve(y_bin.ravel(), y_pred_prob.ravel())
-            AUC = auc(fpr, tpr)
-            fnr = 1 - tpr
-            index = np.argmin(np.abs((fnr - fpr)))
-            EER = np.mean((fnr[index], fpr[index]))
-            plt.plot(fpr, tpr, lw = 2, color = 'red', label = f'ROC curve for {self.number_of_classes} individuals with AUC = {round(AUC, 5)}')
-            plt.plot(EER, 1 - EER, 'bo', label = f'EER = {EER}')
-            plt.plot([1, 0], [0, 1], linestyle = '--')
+        
+        fpr, tpr, threshold = roc_curve(y_bin.ravel(), y_pred_prob.ravel())
+        AUC = auc(fpr, tpr)
+        fnr = 1 - tpr
+        index = np.argmin(np.abs((fnr - fpr)))
+        EER = np.mean((fnr[index], fpr[index]))
+        plt.plot(fpr, tpr, lw = 2, color = 'red', label = f'ROC curve for {self.number_of_classes} individuals with AUC = {round(AUC, 5)}')
+        plt.plot(EER, 1 - EER, 'bo', label = f'EER = {EER}')
+        plt.plot([1, 0], [0, 1], linestyle = '--')
             
         plt.title(roc_title)
         plt.ylabel('True Positive Rate')
         plt.xlabel('False Positive Rate')
         plt.legend(loc = 'lower right')
+        plt.savefig(f'data/results/{roc_title}.png')
+        plt.close()
+        
 
     def FAR_FRR(self, X_test, y_test, model, flip = True):
         genuine_attempts = []
@@ -176,10 +183,14 @@ class Fusion(object):
         plt.xlabel('Scores')
         plt.legend(loc = 'best')
     
-    def confusion_matrix(self, y_pred, y_true, labels):
-        matrix = confusion_matrix(y_true, y_pred)
-        display = ConfusionMatrixDisplay(matrix, display_labels = labels)
-        display.plot()
+    def confusion_matrix(self, y_pred, y_true, matrix_title):
+        # matrix = confusion_matrix(y_true, y_pred)
+        display = ConfusionMatrixDisplay.from_predictions(y_true, y_pred, display_labels = self.class_names)
+        figure = display.figure_
+        figure.set_figwidth(27)
+        figure.set_figheight(16)
+        plt.savefig(f'data/results/{matrix_title}.png')
+        plt.close()
         
 
 class FeatureFusion(Fusion):
@@ -232,13 +243,13 @@ class FeatureFusion(Fusion):
             
         
         
-    def train_svm(self, flip = True, test_model = True, separate_subjects = False, roc_title = 'ROC curve'):
-        svm = OneVsRestClassifier(SVC(kernel = 'linear', max_iter = 1000000, verbose = True, probability = True), n_jobs = -1)
+    def train_svm(self, flip = True, test_model = True, separate_subjects = True, roc_title = 'ROC curve', matrix_title = 'Confusion matrix', results_title = ''):
+        svm = OneVsRestClassifier(SVC(kernel = 'rbf', max_iter = -1, verbose = True, probability = True), n_jobs = -1)
         
         if test_model:
             X_train, X_test, y_train, y_test = train_test_split(self.training_data, self.training_labels, test_size = 0.25, train_size = 0.75, random_state = 250)
             svm.fit(X_train, y_train)
-            y_pred_prob = np.array(svm.decision_function(X_test)) 
+            y_pred_prob = np.array(svm.predict_proba(X_test)) 
             y_pred = np.argmax(y_pred_prob, -1)
             y_bin = label_binarize(y_test, classes = list(range(self.number_of_classes)))
 
@@ -246,16 +257,21 @@ class FeatureFusion(Fusion):
             print(classification_report(y_test, y_pred, target_names = self.class_names, labels = np.unique(self.training_labels)))
             self.FAR_FRR(X_test, y_test, svm.predict_proba, flip = flip)
             self.genuine_vs_imposter(X_test, y_test, svm.predict_proba)
-            self.confusion_matrix(y_pred, y_test, labels = self.class_names)
+            self.confusion_matrix(y_pred, y_test, matrix_title = matrix_title)
             self.ROC_curve(y_bin, y_pred_prob, separate_subjects, roc_title)
-            plt.show()
+            f1 = f1_score(y_test, y_pred, average = 'weighted')
+            precision = precision_score(y_test, y_pred, average = 'weighted')
+            recall = recall_score(y_test, y_pred, average = 'weighted')
+            with open('data/results/results.txt', 'a') as results:
+                results.write(results_title + f' f1 : {f1}, precision : {precision}, recall : {recall}\n')
+                
         else:
             svm.fit(self.training_data, self.training_labels)
 
         return svm
 
 
-    def train(self, epochs = 100, batch_size = 16, model_layer_sizes = (192, 256, 128), flip = True, patience = 15, test_model = True, separate_subjects = False, roc_title = 'ROC curve'):
+    def train(self, epochs = 100, batch_size = 16, model_layer_sizes = (192, 256, 128), flip = True, patience = 15, test_model = True, separate_subjects = True, roc_title = 'ROC curve', matrix_title = 'Confusion matrix', results_title = ''):
         layers = [
             Input(shape = (self.training_data.shape[1]))
         ]
@@ -283,9 +299,14 @@ class FeatureFusion(Fusion):
             predict = lambda x: model.predict(x, verbose = 0)
             self.FAR_FRR(X_test, y_test, predict, flip)
             self.genuine_vs_imposter(X_test, y_test, predict)
-            self.confusion_matrix(y_pred, y_test, labels = self.class_names)
+            self.confusion_matrix(y_pred, y_test, matrix_title = matrix_title)
             self.ROC_curve(y_bin, y_pred_prob, separate_subjects, roc_title)
-            plt.show()
+            f1 = f1_score(y_test, y_pred, average = 'weighted')
+            precision = precision_score(y_test, y_pred, average = 'weighted')
+            recall = recall_score(y_test, y_pred, average = 'weighted')
+            with open('data/results/results.txt', 'a') as results:
+                results.write(results_title + f' f1 : {f1}, precision : {precision}, recall : {recall}\n')
+               
         else:
             model.fit(self.training_data, self.training_labels, batch_size = batch_size, epochs = epochs, shuffle = False, validation_split = 0.1, callbacks = [callback])
         
@@ -347,12 +368,12 @@ class ScoreFusion(Fusion):
         self.training_labels = np.array(self.training_labels)
 
         
-    def train_svm(self, flip = True, test_model = True, separate_subjects = False, roc_title = 'ROC curve'):
+    def train_svm(self, flip = True, test_model = True, separate_subjects = True, roc_title = 'ROC curve', matrix_title = 'Confusion matrix', results_title = ''):
         models = []
         X_tests, y_true = [], None
 
         for i in range((len(self.algorithms))):
-            svm = OneVsRestClassifier(SVC(max_iter = 1000000, verbose = True, probability = True), n_jobs = -1)
+            svm = OneVsRestClassifier(SVC(kernel = 'rbf', max_iter = -1, verbose = True, probability = True), n_jobs = -1)
             if test_model:
                 X_train, X_test, y_train, y_test = train_test_split(self.training_data[i], self.training_labels, shuffle = True, random_state = 250, test_size = 0.25, train_size = 0.75)
                 X_tests.append(X_test)
@@ -376,13 +397,18 @@ class ScoreFusion(Fusion):
             print(classification_report(y_true, y_pred, target_names = self.class_names, labels = np.unique(self.training_labels)))
             self.FAR_FRR(X_tests, y_test, self.vote_svm, flip)
             self.genuine_vs_imposter(X_tests, y_test, self.vote_svm)
-            self.confusion_matrix(y_pred, y_test, labels = self.class_names)
+            self.confusion_matrix(y_pred, y_test, matrix_title = matrix_title)
             self.ROC_curve(y_bin, y_pred_prob, separate_subjects, roc_title)
-            plt.show()
+            f1 = f1_score(y_test, y_pred, average = 'weighted')
+            precision = precision_score(y_test, y_pred, average = 'weighted')
+            recall = recall_score(y_test, y_pred, average = 'weighted')
+            with open('data/results/results.txt', 'a') as results:
+                results.write(results_title + f' f1 : {f1}, precision : {precision}, recall : {recall}\n')
+               
         return models
     
     
-    def train(self, epochs = 100, batch_size = 16, model_layer_sizes = (192, 256, 128), flip = True, patience = 15, test_model = True, separate_subjects = False, roc_title = 'ROC curve'):
+    def train(self, epochs = 100, batch_size = 16, model_layer_sizes = (192, 256, 128), flip = True, patience = 15, test_model = True, separate_subjects = True, roc_title = 'ROC curve', matrix_title = 'Confusion matrix', results_title = ''):
         models = []
         X_tests, y_true = [], None 
         for i in range(len(self.algorithms)):
@@ -420,11 +446,15 @@ class ScoreFusion(Fusion):
             
             print('Score fusion:')
             print(classification_report(y_true, y_pred, target_names = self.class_names, labels = np.unique(self.training_labels)))
-            self.FAR_FRR(X_tests, y_test, self.vote, flip)
-            self.genuine_vs_imposter(X_tests, y_test, self.vote)
-            self.confusion_matrix(np.argmax(y_pred_prob, -1), y_test, labels = self.class_names)
+            self.FAR_FRR(X_tests, y_test, self.vote_svm, flip)
+            self.genuine_vs_imposter(X_tests, y_test, self.vote_svm)
+            self.confusion_matrix(y_pred, y_test, matrix_title = matrix_title)
             self.ROC_curve(y_bin, y_pred_prob, separate_subjects, roc_title)
-            plt.show()
+            f1 = f1_score(y_test, y_pred, average = 'weighted')
+            precision = precision_score(y_test, y_pred, average = 'weighted')
+            recall = recall_score(y_test, y_pred, average = 'weighted')
+            with open('data/results/results.txt', 'a') as results:
+                results.write(results_title + f' f1 : {f1}, precision : {precision}, recall : {recall}\n')
 
         return models
 

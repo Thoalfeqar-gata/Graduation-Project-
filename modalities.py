@@ -19,6 +19,7 @@ from sklearn.metrics import confusion_matrix, classification_report
 from sklearn.preprocessing import label_binarize
 from matplotlib import pyplot as plt
 from keras.callbacks import EarlyStopping
+from sklearn.metrics import f1_score, precision_score, recall_score
 
 
 size = 50
@@ -30,10 +31,20 @@ param = {
 }
 gist = GIST(param)
 
-dnn = VGGFace(False, input_shape = (size, size, 3))
-for layer in dnn.layers:
+vgg16_ = vgg16.VGG16(False, input_shape = (size, size, 3))
+for layer in vgg16_.layers:
     layer.trainable = False
-DNN = lambda images: np.array(dnn.predict(images, 16)).reshape(len(images), -1)
+vgg16_features = lambda images: np.array(vgg16_.predict(images, 16)).reshape(len(images), -1)
+
+vgg19_ = vgg19.VGG19(False, input_shape = (size, size, 3))
+for layer in vgg19_.layers:
+    layer.trainable = False
+vgg19_features = lambda images: np.array(vgg19_.predict(images, 16)).reshape(len(images), -1)
+
+vggface = VGGFace(False, input_shape = (size, size, 3))
+for layer in vggface.layers:
+    layer.trainable = False
+vggface_features = lambda images: np.array(vggface.predict(images, 16)).reshape(len(images), -1)
 
 def deepface_features(images):
     features = []
@@ -83,11 +94,7 @@ training_data = []
 training_labels = []
 class_names = [f'S{i}' for i in range(len(os.listdir(path)))]
 images = []
-# super_resolution = dnn_superres.DnnSuperResImpl_create()
-# super_resolution.readModel('data/opencv data/superres/EDSR_x4.pb')
-# super_resolution.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
-# super_resolution.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
-# super_resolution.setModel('edsr', 4)
+
 
 mesh_detector = mediapipe.solutions.face_mesh.FaceMesh(static_image_mode = True,
                                        max_num_faces = 1,
@@ -135,49 +142,55 @@ for dirname, dirnames, filenames in os.walk(path):
         images.append(nose)
         
 images = np.array(images)
-fusion_obj = fusion.Fusion([], class_names = class_names)
-training_data = DNN(images)
-training_data = np.array(training_data).reshape(len(training_labels), -1)
 training_labels = np.array(training_labels)
-print(training_data.shape, training_labels.shape)
-X_train, X_test, y_train, y_test = train_test_split(training_data, training_labels, test_size = 0.25, train_size = 0.75, random_state = 250)
-
-layers = [
-    Dense(192, 'relu'),
-    Dense(256, 'relu'),
-    Dense(128, 'relu'),
-    Dense(len(class_names), 'softmax')
-]
-
-model = Sequential(layers)
-model.compile('adam', 'sparse_categorical_crossentropy', ['accuracy'])
-callback = EarlyStopping(patience = 30, verbose = 1, restore_best_weights = True, monitor = 'val_accuracy')
-
-model.fit(X_train, y_train, batch_size = 32, epochs = 100, shuffle = False, use_multiprocessing = True, validation_split = 0.1, callbacks = [callback])
-pred_proba = model.predict(X_test)
-pred = np.argmax(pred_proba, -1)
-y_bin = label_binarize(y_test, classes = list(range(len(class_names))))
-
-fusion_obj.confusion_matrix(pred, y_test, class_names)
-fusion_obj.ROC_curve(y_bin, pred_proba, False, 'ROC curve for SIFT features on facial modalities')
-print(classification_report(y_test, pred, target_names = class_names, labels = np.unique(training_labels)))
-plt.show()
+fusion_obj = fusion.Fusion([], class_names = class_names)
+feature_extraction_algorithms = {
+    'SIFT' : SIFTBOWFeatures,
+    'SURF' : SURFBOWFeatures,
+    'GIST' : gist_features,
+    'LBP' : lbp.compute,
+    'Weber' : weber.compute,
+    'HOG' : hog_features,
+    'VGG16' : vgg16_features,
+    'VGG19' : vgg19_features,
+    'VGGFace' : vggface_features,
+    'Face embeddings' : face_embeddings
+}
+classification_algorithms = ['SVM', 'Neural Network']
 
 
+for classification_algorithm in classification_algorithms:
+    for feature_extraction_algorithm in feature_extraction_algorithms.keys():
+        training_data = np.array(feature_extraction_algorithms[feature_extraction_algorithm](images)).reshape(len(training_labels), -1)
+        X_train, X_test, y_train, y_test = train_test_split(training_data, training_labels, test_size = 0.25, train_size = 0.75, random_state = 250)
         
+        if classification_algorithm == 'SVM':
+            SVM = OneVsRestClassifier(SVC(probability = True, verbose = True), n_jobs = -1)
+            SVM.fit(X_train, y_train)
+            y_pred_proba = SVM.predict_proba(X_test)
+            y_pred = np.argmax(y_pred_proba, axis = -1)
+            y_bin = label_binarize(y_test, classes = np.unique(training_labels))
+        elif classification_algorithm == 'Neural Network':
+            layers = [
+            Dense(192, 'relu'),
+            Dense(256, 'relu'),
+            Dense(128, 'relu'),
+            Dense(len(class_names), 'softmax')
+            ]
+            NeuralNetwork = Sequential(layers)
+            NeuralNetwork.compile('adam', 'sparse_categorical_crossentropy', ['accuracy'])
+            callback = EarlyStopping(patience = 30, verbose = 1, restore_best_weights = True, monitor = 'val_accuracy')
 
+            NeuralNetwork.fit(X_train, y_train, 32, 100, callbacks = [callback], validation_split = 0.1, shuffle = False, use_multiprocessing = True)
+            y_pred_proba = NeuralNetwork.predict(X_test)
+            y_pred = np.argmax(y_pred_proba, axis = -1)
+            y_bin = label_binarize(y_test, classes = np.unique(training_labels))
         
-        
-        
-        
-    
-        
-        
-        
-        
-    
- 
-
-
-
-
+        f1 = f1_score(y_test, y_pred, average = 'weighted')
+        precision = precision_score(y_test, y_pred, average = 'weighted')
+        recall = recall_score(y_test, y_pred, average = 'weighted')
+        with open('data/results/results.txt', 'a') as results:
+            results.write(f'Results for {feature_extraction_algorithm} using {classification_algorithm} on modalities. f1 : {f1}, precision : {precision}, recall : {recall}\n')
+            
+        fusion_obj.ROC_curve(y_bin, y_pred_proba, separate_subjects = False, roc_title = f'ROC curve for {feature_extraction_algorithm} using {classification_algorithm} on modalities')
+        fusion_obj.confusion_matrix(y_pred, y_test, matrix_title = f'Confusion matrix for {feature_extraction_algorithm} using {classification_algorithm} on modalities')

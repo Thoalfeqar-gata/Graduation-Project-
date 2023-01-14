@@ -8,6 +8,7 @@ from skimage.feature import hog
 from descriptors.LocalDescriptors import WeberPattern, LocalBinaryPattern
 from descriptors.GIST import GIST
 from fusion import FeatureFusion, ScoreFusion
+from matplotlib import pyplot as plt
 
 param = {
     'orientationsPerScale' : np.array([8, 8, 8, 8]),
@@ -31,10 +32,25 @@ for dirname, dirnames, filenames in os.walk(path):
     total_images += len(subject_images)
 
     
-dnn = ResNet50(False, input_shape = (size, size, 3))
-for layer in dnn.layers:
+resnet50 = ResNet50(False, input_shape = (size, size, 3))
+for layer in resnet50.layers:
     layer.trainable = False
-DNN = lambda images: np.array(dnn.predict(images, 16)).reshape(len(images), -1)
+resnet50_features = lambda images: np.array(resnet50.predict(images, 16)).reshape(len(images), -1)
+
+vgg16_ = vgg16.VGG16(False, input_shape = (size, size, 3))
+for layer in vgg16_.layers:
+    layer.trainable = False
+vgg16_features = lambda images: np.array(vgg16_.predict(images, 16)).reshape(len(images), -1)
+
+vgg19_ = vgg19.VGG19(False, input_shape = (size, size, 3))
+for layer in vgg19_.layers:
+    layer.trainable = False
+vgg19_features = lambda images: np.array(vgg19_.predict(images, 16)).reshape(len(images), -1)
+
+vggface = VGGFace(False, input_shape = (size, size, 3))
+for layer in vggface.layers:
+    layer.trainable = False
+vggface_features = lambda images: np.array(vggface.predict(images, 16)).reshape(len(images), -1)
 
 def deepface_features(images):
     features = []
@@ -78,11 +94,33 @@ def face_embeddings(images):
 
 weber = WeberPattern((4, 4))
 lbp = LocalBinaryPattern(20, 3, (7,7))
+feature_extraction_algorithms = {
+    'SIFT' : SIFTBOWFeatures,
+    'SURF' : SURFBOWFeatures,
+    'GIST' : gist_features,
+    'LBP' : lbp.compute,
+    'Weber' : weber.compute,
+    'HOG' : hog_features,
+    'VGG16' : vgg16_features,
+    'VGG19' : vgg19_features,
+    'VGGFace' : vggface_features,
+    'Face embeddings' : face_embeddings
+}
+classification_algorithms = ['SVM', 'Neural Network']
 
-fusion = FeatureFusion([
-    DNN
-],
-    subjects)
-print(total_images)
-fusion.extract_features(faces_paths,batch_size = total_images, image_size = (size, size))
-model = fusion.train(100, 32, patience = 30, flip = False, roc_title = 'ResNet50')
+for classification_algorithm in classification_algorithms:
+    for feature_extraction_algorithm in feature_extraction_algorithms.keys():
+        fusion = FeatureFusion([
+            feature_extraction_algorithms[feature_extraction_algorithm]
+        ], subjects)
+        
+        if feature_extraction_algorithm in ['SIFT', 'SURF']:
+            fusion.extract_features(faces_paths, batch_size = total_images, image_size = (size, size))
+        else:
+            fusion.extract_features(faces_paths, image_size = (size, size))
+
+        if classification_algorithm == 'SVM':
+            fusion.train_svm(separate_subjects = False, roc_title = f'ROC curve for {feature_extraction_algorithm} using {classification_algorithm} on faces.', matrix_title = f'Confusion matrix for {feature_extraction_algorithm} using {classification_algorithm} on faces', results_title = f'results for {feature_extraction_algorithm} using {classification_algorithm} on faces')
+        else:
+            fusion.train(100, 16, patience = 30, model_layer_sizes = (256, 384, 192), separate_subjects = False, roc_title = f'ROC curve for {feature_extraction_algorithm} using {classification_algorithm} on faces.', matrix_title = f'Confusion matrix for {feature_extraction_algorithm} using {classification_algorithm} on faces', results_title = f'results for {feature_extraction_algorithm} using {classification_algorithm} on faces')
+
