@@ -184,13 +184,13 @@ class Fusion(object):
         plt.legend(loc = 'best')
     
     def confusion_matrix(self, y_pred, y_true, matrix_title):
-        # matrix = confusion_matrix(y_true, y_pred)
         display = ConfusionMatrixDisplay.from_predictions(y_true, y_pred, display_labels = self.class_names)
         figure = display.figure_
         figure.set_figwidth(27)
         figure.set_figheight(16)
         plt.savefig(f'data/results/{matrix_title}.png')
         plt.close()
+
         
 
 class FeatureFusion(Fusion):
@@ -263,7 +263,7 @@ class FeatureFusion(Fusion):
             precision = precision_score(y_test, y_pred, average = 'weighted')
             recall = recall_score(y_test, y_pred, average = 'weighted')
             with open('data/results/results.txt', 'a') as results:
-                results.write(results_title + f' f1 : {f1}, precision : {precision}, recall : {recall}\n')
+                results.write(results_title + f' f1 : {round(f1, 5)}, precision : {round(precision, 5)}, recall : {round(recall, 5)}\n')
                 
         else:
             svm.fit(self.training_data, self.training_labels)
@@ -305,7 +305,7 @@ class FeatureFusion(Fusion):
             precision = precision_score(y_test, y_pred, average = 'weighted')
             recall = recall_score(y_test, y_pred, average = 'weighted')
             with open('data/results/results.txt', 'a') as results:
-                results.write(results_title + f' f1 : {f1}, precision : {precision}, recall : {recall}\n')
+                results.write(results_title + f' f1 : {round(f1, 5)}, precision : {round(precision, 5)}, recall : {round(recall, 5)}\n')
                
         else:
             model.fit(self.training_data, self.training_labels, batch_size = batch_size, epochs = epochs, shuffle = False, validation_split = 0.1, callbacks = [callback])
@@ -403,7 +403,7 @@ class ScoreFusion(Fusion):
             precision = precision_score(y_test, y_pred, average = 'weighted')
             recall = recall_score(y_test, y_pred, average = 'weighted')
             with open('data/results/results.txt', 'a') as results:
-                results.write(results_title + f' f1 : {f1}, precision : {precision}, recall : {recall}\n')
+                results.write(results_title + f' f1 : {round(f1, 5)}, precision : {round(precision, 5)}, recall : {round(recall, 5)}\n')
                
         return models
     
@@ -454,7 +454,7 @@ class ScoreFusion(Fusion):
             precision = precision_score(y_test, y_pred, average = 'weighted')
             recall = recall_score(y_test, y_pred, average = 'weighted')
             with open('data/results/results.txt', 'a') as results:
-                results.write(results_title + f' f1 : {f1}, precision : {precision}, recall : {recall}\n')
+                results.write(results_title + f' f1 : {round(f1, 5)}, precision : {round(precision, 5)}, recall : {round(recall, 5)}\n')
 
         return models
 

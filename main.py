@@ -94,33 +94,39 @@ def face_embeddings(images):
 
 weber = WeberPattern((4, 4))
 lbp = LocalBinaryPattern(20, 3, (7,7))
-feature_extraction_algorithms = {
-    'SIFT' : SIFTBOWFeatures,
-    'SURF' : SURFBOWFeatures,
-    'GIST' : gist_features,
-    'LBP' : lbp.compute,
-    'Weber' : weber.compute,
-    'HOG' : hog_features,
-    'VGG16' : vgg16_features,
-    'VGG19' : vgg19_features,
-    'VGGFace' : vggface_features,
-    'Face embeddings' : face_embeddings
-}
-classification_algorithms = ['SVM', 'Neural Network']
+# feature_extraction_algorithms = {
+#     'SIFT' : SIFTBOWFeatures,
+#     'SURF' : SURFBOWFeatures,
+#     'GIST' : gist_features,
+#     'LBP' : lbp.compute,
+#     'Weber' : weber.compute,
+#     'HOG' : hog_features,
+#     'VGG16' : vgg16_features,
+#     'VGG19' : vgg19_features,
+#     'VGGFace' : vggface_features,
+#     'Face embeddings' : face_embeddings
+# }
+# classification_algorithms = ['SVM', 'Neural Network']
 
-for classification_algorithm in classification_algorithms:
-    for feature_extraction_algorithm in feature_extraction_algorithms.keys():
-        fusion = FeatureFusion([
-            feature_extraction_algorithms[feature_extraction_algorithm]
-        ], subjects)
+# for classification_algorithm in classification_algorithms:
+#     for feature_extraction_algorithm in feature_extraction_algorithms.keys():
+#         fusion = FeatureFusion([
+#             feature_extraction_algorithms[feature_extraction_algorithm]
+#         ], subjects)
         
-        if feature_extraction_algorithm in ['SIFT', 'SURF']:
-            fusion.extract_features(faces_paths, batch_size = total_images, image_size = (size, size))
-        else:
-            fusion.extract_features(faces_paths, image_size = (size, size))
+#         if feature_extraction_algorithm in ['SIFT', 'SURF']:
+#             fusion.extract_features(faces_paths, batch_size = total_images, image_size = (size, size))
+#         else:
+#             fusion.extract_features(faces_paths, image_size = (size, size))
 
-        if classification_algorithm == 'SVM':
-            fusion.train_svm(separate_subjects = False, roc_title = f'ROC curve for {feature_extraction_algorithm} using {classification_algorithm} on faces.', matrix_title = f'Confusion matrix for {feature_extraction_algorithm} using {classification_algorithm} on faces', results_title = f'results for {feature_extraction_algorithm} using {classification_algorithm} on faces')
-        else:
-            fusion.train(100, 16, patience = 30, model_layer_sizes = (256, 384, 192), separate_subjects = False, roc_title = f'ROC curve for {feature_extraction_algorithm} using {classification_algorithm} on faces.', matrix_title = f'Confusion matrix for {feature_extraction_algorithm} using {classification_algorithm} on faces', results_title = f'results for {feature_extraction_algorithm} using {classification_algorithm} on faces')
+#         if classification_algorithm == 'SVM':
+#             fusion.train_svm(separate_subjects = False, roc_title = f'ROC curve for {feature_extraction_algorithm} using {classification_algorithm} on faces.', matrix_title = f'Confusion matrix for {feature_extraction_algorithm} using {classification_algorithm} on faces', results_title = f'results for {feature_extraction_algorithm} using {classification_algorithm} on faces')
+#         else:
+#             fusion.train(100, 16, patience = 30, model_layer_sizes = (256, 384, 192), separate_subjects = False, roc_title = f'ROC curve for {feature_extraction_algorithm} using {classification_algorithm} on faces.', matrix_title = f'Confusion matrix for {feature_extraction_algorithm} using {classification_algorithm} on faces', results_title = f'results for {feature_extraction_algorithm} using {classification_algorithm} on faces')
+
+fusion_obj = FeatureFusion([
+    SIFTBOWFeatures
+], subjects)
+fusion_obj.extract_features(faces_paths, batch_size = total_images, image_size = (size, size))
+fusion_obj.train(10, 16, separate_subjects = False, roc_title = 'Delete me', matrix_title = 'Delete me matrix', results_title = 'Delete me')
 
