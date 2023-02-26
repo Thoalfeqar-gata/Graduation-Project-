@@ -9,6 +9,7 @@ from descriptors.LocalDescriptors import WeberPattern, LocalBinaryPattern
 from descriptors.GIST import GIST
 from fusion import FeatureFusion, ScoreFusion
 from matplotlib import pyplot as plt
+from deepface import DeepFace
 
 param = {
     'orientationsPerScale' : np.array([8, 8, 8, 8]),
@@ -21,8 +22,7 @@ path = 'data/database collage/detections/DB unified/all faces with augmentation'
 size = 100
 
 faces_paths = []
-subjects = [f'S{i}' for i in range(len(os.listdir(path)))]
-print(subjects)
+subjects = []
 total_images = 0
 for dirname, dirnames, filenames in os.walk(path):
     if len(filenames) <= 0:
@@ -30,6 +30,7 @@ for dirname, dirnames, filenames in os.walk(path):
     subject_images = [os.path.join(dirname, filename) for filename in filenames]
     faces_paths.append(subject_images)
     total_images += len(subject_images)
+    subjects.append(f'S{os.path.split(dirname)[1]}')
 
     
 resnet50 = ResNet50(False, input_shape = (size, size, 3))
@@ -64,7 +65,7 @@ def hog_features(images):
     features = []
     for i in tqdm(range(len(images))):
         image = cv2.cvtColor(images[i], cv2.COLOR_BGR2GRAY)
-        f = hog(image, 10, (8, 8))
+        f = hog(image, 10, (8, 8), (2, 2))
         features.append(f)
     
     return features
@@ -125,8 +126,8 @@ lbp = LocalBinaryPattern(20, 3, (7,7))
 #             fusion.train(100, 16, patience = 30, model_layer_sizes = (256, 384, 192), separate_subjects = False, roc_title = f'ROC curve for {feature_extraction_algorithm} using {classification_algorithm} on faces.', matrix_title = f'Confusion matrix for {feature_extraction_algorithm} using {classification_algorithm} on faces', results_title = f'results for {feature_extraction_algorithm} using {classification_algorithm} on faces')
 
 fusion_obj = FeatureFusion([
-    SIFTBOWFeatures
+    hog_features
 ], subjects)
-fusion_obj.extract_features(faces_paths, batch_size = total_images, image_size = (size, size))
-fusion_obj.train(10, 16, separate_subjects = False, roc_title = 'Delete me', matrix_title = 'Delete me matrix', results_title = 'Delete me')
-
+fusion_obj.extract_features(faces_paths, image_size = (size, size))
+model = fusion_obj.train(250, 32, patience = 25, separate_subjects = False, roc_title = 'Delete me', matrix_title = 'Delete me matrix', results_title = 'Delete me')
+model.save('data/models/hog with feature fusion')

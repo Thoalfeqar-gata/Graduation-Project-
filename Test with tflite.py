@@ -1,5 +1,5 @@
 import cv2, numpy as np, face_recognition, keras, tensorflow as tf, os, time
-model = tf.lite.Interpreter(model_path = 'data/models/MobileNetV2 tflite with me in it/MobileNetV2.tflite')
+model = tf.lite.Interpreter(model_path = 'data/models/MobileNetV2 128 optimized/model.tflite')
 model.allocate_tensors()
 input_details = model.get_input_details()
 output_details = model.get_output_details()
@@ -7,6 +7,8 @@ output_details = model.get_output_details()
 
 videoCapture = cv2.VideoCapture(0)
 face_detector = cv2.CascadeClassifier('data/opencv data/cascades/haarcascade_frontalface_default.xml')
+times = []
+frames_processed = 0
 while True:
     t1 = time.time()
     ret, frame = videoCapture.read()
@@ -23,10 +25,15 @@ while True:
         else:
             cv2.putText(frame, 'Unknown', (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
             
-        
+    
     t2 = time.time()
     cv2.imshow('hi', frame)
-    print(1/(t2 - t1))
+    times.append(1/(t2 - t1))
+    frames_processed += 1
+    
     if cv2.waitKey(1) == ord('q'):
         break
-    
+    if frames_processed >= 100:
+        break
+
+print(np.average(times))

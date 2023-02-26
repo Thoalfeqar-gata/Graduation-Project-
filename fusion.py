@@ -1,4 +1,4 @@
-import numpy as np, cv2, math, time
+import numpy as np, cv2, math, time, os
 from keras.layers import Dense, Input
 from keras.losses import categorical_crossentropy
 from keras.optimizers import Adam
@@ -201,7 +201,8 @@ class FeatureFusion(Fusion):
     def extract_features(self, image_paths, batch_size = 2000, image_size = (128, 128)):
         self.number_of_classes = len(image_paths)
         self.training_labels = []
-        for i, _class in enumerate(image_paths):
+        for _class in image_paths:
+            i = int(os.path.split(os.path.split(_class[0])[0])[1])
             self.training_labels.extend([i] * len(_class))
         
         image_paths = self.preprocess_list(image_paths)
@@ -255,8 +256,8 @@ class FeatureFusion(Fusion):
 
             print('Feature fusion:')                    
             print(classification_report(y_test, y_pred, target_names = self.class_names, labels = np.unique(self.training_labels)))
-            self.FAR_FRR(X_test, y_test, svm.predict_proba, flip = flip)
-            self.genuine_vs_imposter(X_test, y_test, svm.predict_proba)
+            # self.FAR_FRR(X_test, y_test, svm.predict_proba, flip = flip)
+            # self.genuine_vs_imposter(X_test, y_test, svm.predict_proba)
             self.confusion_matrix(y_pred, y_test, matrix_title = matrix_title)
             self.ROC_curve(y_bin, y_pred_prob, separate_subjects, roc_title)
             f1 = f1_score(y_test, y_pred, average = 'weighted')
@@ -297,8 +298,8 @@ class FeatureFusion(Fusion):
             print(classification_report(y_test, y_pred, target_names = self.class_names, labels = np.unique(self.training_labels)))
             
             predict = lambda x: model.predict(x, verbose = 0)
-            self.FAR_FRR(X_test, y_test, predict, flip)
-            self.genuine_vs_imposter(X_test, y_test, predict)
+            # self.FAR_FRR(X_test, y_test, predict, flip)
+            # self.genuine_vs_imposter(X_test, y_test, predict)
             self.confusion_matrix(y_pred, y_test, matrix_title = matrix_title)
             self.ROC_curve(y_bin, y_pred_prob, separate_subjects, roc_title)
             f1 = f1_score(y_test, y_pred, average = 'weighted')
@@ -329,7 +330,8 @@ class ScoreFusion(Fusion):
     def extract_features(self, image_paths, batch_size = 2000, image_size = (128, 128)):
         self.number_of_classes = len(image_paths)
         
-        for i, _class in enumerate(image_paths):
+        for _class in image_paths:
+            i = int(os.path.split(os.path.split(_class[0])[0])[1])
             self.training_labels.extend([i] * len(_class))
             
         image_paths = self.preprocess_list(image_paths)
@@ -395,8 +397,8 @@ class ScoreFusion(Fusion):
             
             print('Score fusion:')
             print(classification_report(y_true, y_pred, target_names = self.class_names, labels = np.unique(self.training_labels)))
-            self.FAR_FRR(X_tests, y_test, self.vote_svm, flip)
-            self.genuine_vs_imposter(X_tests, y_test, self.vote_svm)
+            # self.FAR_FRR(X_tests, y_test, self.vote_svm, flip)
+            # self.genuine_vs_imposter(X_tests, y_test, self.vote_svm)
             self.confusion_matrix(y_pred, y_test, matrix_title = matrix_title)
             self.ROC_curve(y_bin, y_pred_prob, separate_subjects, roc_title)
             f1 = f1_score(y_test, y_pred, average = 'weighted')
@@ -446,8 +448,8 @@ class ScoreFusion(Fusion):
             
             print('Score fusion:')
             print(classification_report(y_true, y_pred, target_names = self.class_names, labels = np.unique(self.training_labels)))
-            self.FAR_FRR(X_tests, y_test, self.vote_svm, flip)
-            self.genuine_vs_imposter(X_tests, y_test, self.vote_svm)
+            # self.FAR_FRR(X_tests, y_test, self.vote_svm, flip)
+            # self.genuine_vs_imposter(X_tests, y_test, self.vote_svm)
             self.confusion_matrix(y_pred, y_test, matrix_title = matrix_title)
             self.ROC_curve(y_bin, y_pred_prob, separate_subjects, roc_title)
             f1 = f1_score(y_test, y_pred, average = 'weighted')
