@@ -3,35 +3,33 @@ from tqdm import tqdm
 
 transform = A.Compose([
     A.HorizontalFlip(p = 0.7),
-    A.RandomBrightnessContrast(brightness_limit = 0.5, contrast_limit = 0.5, p = 0.8),
-    A.RandomGamma(p = 0.5),
+    A.RandomBrightnessContrast(brightness_limit = 0.3, contrast_limit = 0.1, p = 0.8),
+    A.RandomGamma(gamma_limit = (50, 80), p = 0.5),
     A.GaussianBlur(blur_limit = (3, 3), p = 0.5),
-    A.Emboss(p = 0.5),
-    A.CLAHE(),
-    A.Equalize(p = 0.5),
-    A.FancyPCA(p = 0.5),
+    A.Emboss(alpha = (0.1, 0.3), strength = (0.1, 0.4), p = 0.5),
+    A.CLAHE(p = 0.8),
+    A.Equalize(p = 0.4),
+    # A.FancyPCA(p = 0.5),
     A.GaussNoise(p = 0.5),
     A.ImageCompression(quality_lower = 99, compression_type = A.augmentations.transforms.ImageCompression.ImageCompressionType.JPEG, p = 0.5),
     A.ISONoise(intensity = (0.1, 0.15), p = 0.5),
     A.PixelDropout(p = 0.5),
-    A.RandomShadow(p = 0.5),
+    A.RandomShadow(shadow_dimension = 3, p = 0.5),
     # A.RandomToneCurve(p = 0.5),
     A.Sharpen(p = 0.5),
     A.Posterize(num_bits = 7, p = 0.5),
-    A.InvertImg(),
-    A.Affine(scale = (0.7, 1.3), translate_percent = (0, 0.2), rotate = (0, 15)),
-    A.ChannelDropout(),
-    A.CoarseDropout(),
-    A.ColorJitter(),
-    A.MedianBlur(),
-    A.Solarize(),
+    # A.InvertImg(),
+    A.Affine(scale = (0.9, 1.1), translate_percent = (0, 0.05), rotate = (0, 5)),
+    A.CoarseDropout(max_holes = 4),
+    A.MedianBlur(blur_limit = 3),
+    A.Resize(144, 144, cv2.INTER_CUBIC, p = 0.5),
     A.MultiplicativeNoise()
 ])
 
-path = os.path.join('data', 'database collage', 'detections', 'DB unified', 'all faces')
-output_path = os.path.join('data', 'database collage', 'detections', 'DB unified', 'all faces with augmentation')
-increase_amount = 50
-maximum_images_per_subject = 10000
+path = os.path.join('data', 'lfw', 'lfw_funneled')
+output_path = os.path.join('data', 'lfw', 'lfw augmented')
+increase_amount = 100
+maximum_images_per_subject = 1000
 subjects = os.listdir(path)
 
 for index in tqdm(range(len(subjects))):

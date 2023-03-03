@@ -3,23 +3,27 @@ from keras_vggface import VGGFace
 from tqdm import tqdm
 from keras.applications.mobilenet_v2 import MobileNetV2
 from keras.applications.vgg16 import VGG16
+from keras.applications.resnet import ResNet50
+from keras_vggface import VGGFace
 from keras.layers import Dense, Flatten
 from keras.models import Sequential, Model
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
-from keras.callbacks import EarlyStopping
+from keras.callbacks import EarlyStopping, ModelCheckpoint
 from sklearn.preprocessing import label_binarize
 from sklearn.metrics import f1_score, precision_score, recall_score
 from fusion import Fusion
 import tensorflow as tf
 
 size = 100
+network_name = 'MobileNetV2 (128-256-192)'
 path = 'data/database collage/detections/DB unified/all faces with augmentation'
+checkpoint_filepath = f'data/models/checkpoints/{network_name}/'
 subjects_num = len(os.listdir(path))
 training_data = []
 training_labels = []
 target_names = []
-limit = 10000000
+limit = 1000000
 for dirname, dirnames, filenames in os.walk(path):
     if len(filenames) <= 0:
         continue
@@ -41,27 +45,33 @@ training_data = np.array(training_data)
 training_labels = np.array(training_labels)
 X_train, X_test, y_train, y_test = train_test_split(training_data, training_labels, test_size = 0.25, train_size = 0.75, random_state = 200)
 
-# model = MobileNetV2(include_top = False, input_shape = (size, size, 3), weights = 'imagenet')
-# model.summary()
-# x = Flatten()(model.layers[-1].output)
-# x = Dense(128, 'relu')(x)
-# x = Dense(128, 'relu')(x)
-# x = Dense(128, 'relu')(x)
-# x = Dense(subjects_num, 'softmax')(x)
-# model = Model(inputs = model.input, outputs = [x])
-# model.compile('adam', 'sparse_categorical_crossentropy', ['accuracy'])
-# callback = EarlyStopping(patience = 30, verbose = 1, restore_best_weights = True, monitor = 'val_accuracy')
+model = MobileNetV2(include_top = False, input_shape = (size, size, 3))
+x = Flatten()(model.layers[-1].output)
+x = Dense(128, 'relu')(x)
+x = Dense(256, 'relu')(x)
+x = Dense(192, 'relu')(x)
+x = Dense(subjects_num, 'softmax')(x)
+model = Model(inputs = model.input, outputs = [x])
+model.compile('adam', 'sparse_categorical_crossentropy', ['accuracy'])
+model.summary()
 
-# model.fit(X_train, y_train, 32, 250, validation_split = 0.1, shuffle = False, callbacks = [callback])
-model = tf.keras.models.load_model('data/models/MobileNetV2 384')
+callback1 = EarlyStopping(patience = 75, verbose = 1, restore_best_weights = True, monitor = 'val_accuracy')
+callback2 = ModelCheckpoint(checkpoint_filepath, monitor = 'val_accuracy', verbose = 1, save_weights_only = True)
+try:
+    model.load_weights(checkpoint_filepath)
+    print('Weights loaded')
+except:
+    pass
+
+# model.fit(X_train, y_train, 32, 500, validation_split = 0.1, shuffle = False, callbacks = [callback1, callback2])
 prediction_probability = model.predict(X_test)
-model.save('data/models/MobileNetV2 384')
+model.save(f'data/models/{network_name}')
 model_converter = tf.lite.TFLiteConverter.from_keras_model(model)
 model_optimized = model_converter.convert()
-with open('data/models/MobileNetV2 384 optimized/model.tflite', 'wb') as f:
+with open(f'data/models/{network_name} optimized/model.tflite', 'wb') as f:
   f.write(model_optimized)
 
-interpreter = tf.lite.Interpreter(model_path = 'data/models/MobileNetV2 384 optimized/model.tflite')
+interpreter = tf.lite.Interpreter(model_path = f'data/models/{network_name} optimized/model.tflite')
 interpreter.allocate_tensors()
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
@@ -74,7 +84,7 @@ for i in range(len(X_test)):
     prediction_probability_optimized.append(pred)
 prediction_probability_optimized = np.array(prediction_probability_optimized)
 
-titles = ['MobileNetV2 384', 'MobileNetV2 384 optimized']
+titles = [f'{network_name}', f'{network_name} optimized']
 for i, prediction_probabilities in enumerate([prediction_probability, prediction_probability_optimized]):
     prediction = np.argmax(prediction_probabilities, -1)
     print(classification_report(y_test, prediction, target_names = target_names))

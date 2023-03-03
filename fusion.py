@@ -48,7 +48,7 @@ class Fusion(object):
         fnr = 1 - tpr
         index = np.argmin(np.abs((fnr - fpr)))
         EER = np.mean((fnr[index], fpr[index]))
-        plt.plot(fpr, tpr, lw = 2, color = 'red', label = f'ROC curve for {self.number_of_classes} individuals with AUC = {round(AUC, 5)}')
+        plt.plot(fpr, tpr, lw = 2, color = 'red', label = f'ROC curve for {self.number_of_classes} individuals with AUC = {AUC}')
         plt.plot(EER, 1 - EER, 'bo', label = f'EER = {EER}')
         plt.plot([1, 0], [0, 1], linestyle = '--')
             

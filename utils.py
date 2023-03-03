@@ -426,7 +426,7 @@ def extract_faces_from_database(images_path, output_path, face_detection_confide
     facenet = FaceNet()
 
     for i in tqdm(range(len(image_paths))):
-        img = cv2.resize(cv2.imread(image_paths[i]), (480, 640))
+        img = cv2.imread(image_paths[i])
         lighting_condition = seperate_dim_lit(img)
         
         boxes = face_recognition.face_locations(img, 1, model = 'cnn')
@@ -443,7 +443,7 @@ def extract_faces_from_database(images_path, output_path, face_detection_confide
     clt = SpectralClustering(n_clusters = 20, n_jobs = -1)
     clt.fit(encodings)
     
-    padding = 10
+    padding = 3
     labelIDs = np.unique(clt.labels_)
     print(labelIDs)
     for labelID in labelIDs:
