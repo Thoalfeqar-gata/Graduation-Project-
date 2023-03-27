@@ -33,8 +33,8 @@ class Fusion(object):
     
     def ROC_curve(self, y_bin, y_pred_prob, separate_subjects, roc_title):
         figure = plt.figure('ROC curve')
-        figure.set_figwidth(6.4)
-        figure.set_figheight(4.8)
+        figure.set_figwidth(19.2)
+        figure.set_figheight(10.8)
         line_styles = [':', '-', '--', '-.']
         
         if(separate_subjects):
@@ -201,8 +201,7 @@ class FeatureFusion(Fusion):
     def extract_features(self, image_paths, batch_size = 2000, image_size = (128, 128)):
         self.number_of_classes = len(image_paths)
         self.training_labels = []
-        for _class in image_paths:
-            i = int(os.path.split(os.path.split(_class[0])[0])[1])
+        for i, _class in enumerate(image_paths):
             self.training_labels.extend([i] * len(_class))
         
         image_paths = self.preprocess_list(image_paths)
@@ -221,8 +220,10 @@ class FeatureFusion(Fusion):
             for _ in range(batch_size):
                 if index >= len(image_paths):
                     break
-                
-                img = cv2.resize(cv2.imread(image_paths[index]), image_size)
+                if image_size is not None:
+                    img = cv2.resize(cv2.imread(image_paths[index]), image_size)
+                else:
+                    img = cv2.imread(image_paths[index])
                 images.append(img)
                 index += 1
             
@@ -330,8 +331,7 @@ class ScoreFusion(Fusion):
     def extract_features(self, image_paths, batch_size = 2000, image_size = (128, 128)):
         self.number_of_classes = len(image_paths)
         
-        for _class in image_paths:
-            i = int(os.path.split(os.path.split(_class[0])[0])[1])
+        for i, _class in enumerate(image_paths):
             self.training_labels.extend([i] * len(_class))
             
         image_paths = self.preprocess_list(image_paths)
@@ -351,8 +351,10 @@ class ScoreFusion(Fusion):
             for _ in range(batch_size):
                 if index >= len(image_paths):
                     break
-                
-                img = cv2.resize(cv2.imread(image_paths[index]), image_size)
+                if image_size is not None:
+                    img = cv2.resize(cv2.imread(image_paths[index]), image_size)
+                else:
+                    img = cv2.imread(image_paths[index])
                 images.append(img)
                 index += 1
             
@@ -399,14 +401,14 @@ class ScoreFusion(Fusion):
             print(classification_report(y_true, y_pred, target_names = self.class_names, labels = np.unique(self.training_labels)))
             # self.FAR_FRR(X_tests, y_test, self.vote_svm, flip)
             # self.genuine_vs_imposter(X_tests, y_test, self.vote_svm)
-            self.confusion_matrix(y_pred, y_test, matrix_title = matrix_title)
-            self.ROC_curve(y_bin, y_pred_prob, separate_subjects, roc_title)
+            # self.confusion_matrix(y_pred, y_test, matrix_title = matrix_title)
             f1 = f1_score(y_test, y_pred, average = 'weighted')
             precision = precision_score(y_test, y_pred, average = 'weighted')
             recall = recall_score(y_test, y_pred, average = 'weighted')
             with open('data/results/results.txt', 'a') as results:
                 results.write(results_title + f' f1 : {round(f1, 5)}, precision : {round(precision, 5)}, recall : {round(recall, 5)}\n')
                
+            self.ROC_curve(y_bin, y_pred_prob, separate_subjects, roc_title)
         return models
     
     
@@ -450,7 +452,7 @@ class ScoreFusion(Fusion):
             print(classification_report(y_true, y_pred, target_names = self.class_names, labels = np.unique(self.training_labels)))
             # self.FAR_FRR(X_tests, y_test, self.vote_svm, flip)
             # self.genuine_vs_imposter(X_tests, y_test, self.vote_svm)
-            self.confusion_matrix(y_pred, y_test, matrix_title = matrix_title)
+            # self.confusion_matrix(y_pred, y_test, matrix_title = matrix_title)
             self.ROC_curve(y_bin, y_pred_prob, separate_subjects, roc_title)
             f1 = f1_score(y_test, y_pred, average = 'weighted')
             precision = precision_score(y_test, y_pred, average = 'weighted')

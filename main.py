@@ -10,6 +10,8 @@ from descriptors.GIST import GIST
 from fusion import FeatureFusion, ScoreFusion
 from matplotlib import pyplot as plt
 from deepface import DeepFace
+import pickle
+from keras_facenet import FaceNet
 
 param = {
     'orientationsPerScale' : np.array([8, 8, 8, 8]),
@@ -18,19 +20,19 @@ param = {
     'fc_prefilt' : 10
 }
 gist = GIST(param)
-path = 'data/database collage/detections/DB unified/all faces with augmentation'
-size = 100
-
+path = 'data/lfw/lfw augmented'
+size = 120
+images_per_subject = 30
 faces_paths = []
 subjects = []
 total_images = 0
 for dirname, dirnames, filenames in os.walk(path):
     if len(filenames) <= 0:
         continue
-    subject_images = [os.path.join(dirname, filename) for filename in filenames]
+    subject_images = [os.path.join(dirname, filename) for filename in filenames][:images_per_subject]
     faces_paths.append(subject_images)
     total_images += len(subject_images)
-    subjects.append(f'S{os.path.split(dirname)[1]}')
+    subjects.append(f'{os.path.split(dirname)[1]}')
 
     
 resnet50 = ResNet50(False, input_shape = (size, size, 3))
@@ -51,14 +53,29 @@ vgg19_features = lambda images: np.array(vgg19_.predict(images, 16)).reshape(len
 vggface = VGGFace(False, input_shape = (size, size, 3))
 for layer in vggface.layers:
     layer.trainable = False
-vggface_features = lambda images: np.array(vggface.predict(images, 16)).reshape(len(images), -1)
+vggface_features = lambda images: np.array(vggface.predict(np.array(images), 16)).reshape(len(images), -1)
 
+deepface_model = DeepFace.build_model('Facenet')
 def deepface_features(images):
     features = []
     for i in tqdm(range(len(images))):
-        f = DeepFace.represent(images[i], 'Facenet', detector_backend = 'dlib', enforce_detection = False)
+        f = DeepFace.represent(images[i], model = deepface_model, detector_backend = 'dlib', enforce_detection = False)
         features.append(f)
     return features
+
+def facenet(images):
+    facenet_model = FaceNet()
+    faces = []
+    for i in tqdm(range(len(images))):
+        try:
+            top, right, bottom, left = face_recognition.face_locations(images[i], 1, model = 'cnn')[0]
+            face_image = images[i][top:bottom, left:right]
+            faces.append(face_image)
+        except:
+            faces.append(images[i])
+            
+    return np.array(facenet_model.embeddings(faces))
+    
         
         
 def hog_features(images):
@@ -82,7 +99,7 @@ def gist_features(images):
 def face_embeddings(images):
     features = []
     for i in tqdm(range(len(images))):
-        embedding = np.array(face_recognition.face_encodings(images[i], model = 'large'))
+        embedding = np.array(face_recognition.face_encodings(images[i], num_jitters = 3, model = 'large'))
         
         if embedding.shape == (0,):
             embedding = np.zeros((128,))
@@ -91,7 +108,7 @@ def face_embeddings(images):
         
         features.append(embedding)
         
-    return features
+    return np.array(features)
 
 weber = WeberPattern((4, 4))
 lbp = LocalBinaryPattern(20, 3, (7,7))
@@ -125,9 +142,11 @@ lbp = LocalBinaryPattern(20, 3, (7,7))
 #         else:
 #             fusion.train(100, 16, patience = 30, model_layer_sizes = (256, 384, 192), separate_subjects = False, roc_title = f'ROC curve for {feature_extraction_algorithm} using {classification_algorithm} on faces.', matrix_title = f'Confusion matrix for {feature_extraction_algorithm} using {classification_algorithm} on faces', results_title = f'results for {feature_extraction_algorithm} using {classification_algorithm} on faces')
 
-fusion_obj = FeatureFusion([
-    hog_features
-], subjects)
-fusion_obj.extract_features(faces_paths, image_size = (size, size))
-model = fusion_obj.train(250, 32, patience = 25, separate_subjects = False, roc_title = 'Delete me', matrix_title = 'Delete me matrix', results_title = 'Delete me')
-model.save('data/models/hog with feature fusion')
+fusion_obj = ScoreFusion([
+    face_embeddings,
+    facenet
+], subjects, [3, 2])
+fusion_obj.extract_features(faces_paths, image_size = None)
+model = fusion_obj.train_svm(separate_subjects = False, roc_title = 'ROC curve of lfw dataset', matrix_title = 'Confusion matrix of lfw dataset', results_title = 'lfw dataset results')
+file = open('data/models/svm of lfw dataset/model.pickle', 'wb')
+pickle.dump(model, file)

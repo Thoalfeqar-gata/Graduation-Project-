@@ -1,4 +1,4 @@
-import dlib, cv2, os, numpy as np, csv, face_recognition, skimage.util as util
+import dlib, cv2, os, numpy as np, csv, face_recognition, skimage.util as util, time
 from tqdm import tqdm
 from keras_facenet import FaceNet
 from matplotlib import pyplot as plt
@@ -11,6 +11,7 @@ from sklearn.cluster import SpectralClustering
 from descriptors.LocalDescriptors import WeberPattern, LocalBinaryPattern
 import tensorflow as tf
 import mediapipe as mp
+
 
 def get_cascades():
     face_cascade = cv2.CascadeClassifier('data/cascades/haarcascade_frontalface_default.xml')
@@ -411,10 +412,10 @@ def face_mesh_mp(img, mesh_detector):
         return None
 
 def extract_faces_from_database(images_path, output_path, face_detection_confidence = 0.7):
-    mesh_detector = mp.solutions.face_mesh.FaceMesh(static_image_mode = True,
-                                                    max_num_faces = 1,
-                                                    refine_landmarks = True,
-                                                    min_detection_confidence = face_detection_confidence)
+    # mesh_detector = mp.solutions.face_mesh.FaceMesh(static_image_mode = True,
+    #                                                 max_num_faces = 1,
+    #                                                 refine_landmarks = True,
+    #                                                 min_detection_confidence = face_detection_confidence)
     image_paths = []
     for dir, dirnames, filenames in os.walk(images_path):
         if len(filenames) > 0:
@@ -423,21 +424,25 @@ def extract_faces_from_database(images_path, output_path, face_detection_confide
                     image_paths.append(os.path.join(dir, filename))
     
     detection_data = []
-    facenet = FaceNet()
+    # facenet = FaceNet()
 
     for i in tqdm(range(len(image_paths))):
-        img = cv2.imread(image_paths[i])
-        lighting_condition = seperate_dim_lit(img)
-        
-        boxes = face_recognition.face_locations(img, 1, model = 'cnn')
-        if len(boxes) <= 0:
+        try:
+            img = cv2.imread(image_paths[i])
+            # lighting_condition = seperate_dim_lit(img)
+            
+            boxes = face_recognition.face_locations(img, 1, 'cnn')
+            if len(boxes) <= 0:
+                continue
+            print('Found face!')
+            # faces = [img[top : bottom, left : right] for top, right, bottom, left in boxes]
+            # encodings = facenet.embeddings(faces)
+            encodings = face_recognition.face_encodings(img, boxes, num_jitters = 3, model = 'large')
+            data = [{'encoding' : encoding, 'location' : box, 'image path' : image_paths[i] } for encoding, box in zip(encodings, boxes)]
+            detection_data.extend(data)
+        except:
             continue
-        top, right, bottom, left = boxes[0]
-        # encodings = facenet.embeddings([img[top : bottom, left : right] for top, right, bottom, left in boxes])
-        encodings = face_recognition.face_encodings(img, boxes, num_jitters = 3, model = 'large')
-        data = [{'encoding' : encoding, 'location' : box, 'image path' : image_paths[i], 'lighting condition' : lighting_condition} for encoding, box in zip(encodings, boxes)]
-        detection_data.extend(data)
-    
+        
     encodings = [data['encoding'] for data in detection_data]
     print('Found this many encodings:', len(encodings))
     clt = SpectralClustering(n_clusters = 20, n_jobs = -1)
@@ -465,16 +470,22 @@ def extract_faces_from_database(images_path, output_path, face_detection_confide
             bottom = min(h, bottom + padding)
             right = min(w, right + padding)
             
-            face = face[top : bottom, left : right]
-            faces.append(cv2.resize(face, (128, 128)))
-            [right_eye_visible, left_eye_visible, mouth_visible] = extract_face_info(face, mesh_detector)
-            
-            if right_eye_visible == None or left_eye_visible == None or mouth_visible == None:
+            try:
+                face = face[top : bottom, left : right]
+                faces.append(cv2.resize(face, (128, 128)))
+                # [right_eye_visible, left_eye_visible, mouth_visible] = extract_face_info(face, mesh_detector)
+                
+                # if right_eye_visible == None or left_eye_visible == None or mouth_visible == None:
+                #     right_eye_visible = -1
+                #     left_eye_visible = -1
+                #     mouth_visible = -1
+                
+                # name = f'{i}_C_{str(int(lighting_condition))}_R_{str(int(right_eye_visible))}_L_{str(int(left_eye_visible))}_N_1_M_{str(int(mouth_visible))}.jpg'
+                name = f'image {time.time()}.jpg'
+                print(name)
+                cv2.imwrite(os.path.join(output_path, str(labelID), name), face)
+            except:
                 continue
-            
-            name = f'{i}_C_{str(int(lighting_condition))}_R_{str(int(right_eye_visible))}_L_{str(int(left_eye_visible))}_N_1_M_{str(int(mouth_visible))}.jpg'
-            print(name)
-            cv2.imwrite(os.path.join(output_path, str(labelID), name), face)
         
         
 

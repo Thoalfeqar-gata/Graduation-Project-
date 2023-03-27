@@ -29,7 +29,7 @@ while True:
     
     if cv2.waitKey(1) == ord('q'):
         break
-    if frames_processed >= 100:
+    if frames_processed >= 10000:
         break
 
 print(np.average(times))
