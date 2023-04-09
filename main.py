@@ -20,8 +20,8 @@ param = {
     'fc_prefilt' : 10
 }
 gist = GIST(param)
-path = 'data/database collage/detections/DB unified/all faces with augmentation'
-size = 120
+path = 'data/database collage/detections/DB unified of friends/DB with augmentation'
+size = 180
 images_per_subject = 1500
 faces_paths = []
 subjects = []
@@ -29,7 +29,7 @@ total_images = 0
 for dirname, dirnames, filenames in os.walk(path):
     if len(filenames) <= 0:
         continue
-    subject_images = [os.path.join(dirname, filename) for filename in filenames][:images_per_subject]
+    subject_images = [os.path.join(dirname, filename) for filename in filenames]
     faces_paths.append(subject_images)
     total_images += len(subject_images)
     subjects.append(f'{os.path.split(dirname)[1]}')
@@ -59,7 +59,7 @@ deepface_model = DeepFace.build_model('Facenet')
 def deepface_features(images):
     features = []
     for i in tqdm(range(len(images))):
-        f = DeepFace.represent(images[i], model = deepface_model, detector_backend = 'dlib', enforce_detection = False)
+        f = DeepFace.represent(images[i], model = deepface_model, detector_backend = 'opencv', enforce_detection = False)
         features.append(f)
     return features
 
@@ -102,6 +102,7 @@ def face_embeddings(images):
         embedding = np.array(face_recognition.face_encodings(images[i], num_jitters = 3, model = 'large'))
         
         if embedding.shape == (0,):
+            print('hi')
             embedding = np.zeros((128,))
         else:
             embedding = embedding[0]
@@ -142,12 +143,12 @@ lbp = LocalBinaryPattern(16, 2, (3,3))
 #         else:
 #             fusion.train(100, 16, patience = 30, model_layer_sizes = (256, 384, 192), separate_subjects = False, roc_title = f'ROC curve for {feature_extraction_algorithm} using {classification_algorithm} on faces.', matrix_title = f'Confusion matrix for {feature_extraction_algorithm} using {classification_algorithm} on faces', results_title = f'results for {feature_extraction_algorithm} using {classification_algorithm} on faces')
 
-with open('data/models/HOG and LBP/info.txt', 'w') as file:
+with open('data/models/svm using dlib face embeddings/info.txt', 'w') as file:
     file.write(f'face_size = {(size, size)}')
 fusion_obj = FeatureFusion([
-    hog_features
+    deepface_features
 ], subjects)
-fusion_obj.extract_features(faces_paths, image_size = (size, size))
-model = fusion_obj.train_svm(separate_subjects = False, roc_title = 'ROC curve of HOG and LBP', matrix_title = 'Confusion matrix of HOG and LBP', results_title = 'HOG and LBP results')
-file = open('data/models/HOG and LBP/model.pickle', 'wb')
+fusion_obj.extract_features(faces_paths, image_size = None)
+model = fusion_obj.train_svm(separate_subjects = False, roc_title = 'ROC curve of face embeddings on friends database', matrix_title = 'Confusion matrix of face embeddings on friends database', results_title = 'face embeddings on friends database')
+file = open('data/models/svm using dlib face embeddings/model.pickle', 'wb')
 pickle.dump(model, file)

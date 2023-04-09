@@ -2,6 +2,7 @@ import os, utils, pickle, face_recognition, cv2, numpy as np
 from keras_vggface import VGGFace
 from tqdm import tqdm
 from keras.applications.mobilenet_v2 import MobileNetV2
+from keras.applications.nasnet import NASNetMobile
 from keras.applications.vgg16 import VGG16
 from keras.applications.resnet import ResNet50
 from keras_vggface import VGGFace
@@ -15,15 +16,18 @@ from sklearn.metrics import f1_score, precision_score, recall_score
 from fusion import Fusion
 import tensorflow as tf
 
-size = 100
-network_name = 'MobileNetV2 (128-256-192)'
-path = 'data/database collage/detections/DB unified/all faces with augmentation'
+size = 180
+network_name = 'NASNet (128-128-128)'
+path = 'data/database collage/detections/DB unified of friends/DB with augmentation'
 checkpoint_filepath = f'data/models/checkpoints/{network_name}/'
 subjects_num = len(os.listdir(path))
 training_data = []
 training_labels = []
 target_names = []
 limit = 1000000
+with open('data/models/model input sizes.txt', 'a') as file:
+    file.writelines(f'{network_name} = ({size}, {size})')
+    
 for dirname, dirnames, filenames in os.walk(path):
     if len(filenames) <= 0:
         continue
@@ -39,23 +43,21 @@ for dirname, dirnames, filenames in os.walk(path):
         if counter >= limit:
             break
     
-        
-    
 training_data = np.array(training_data)
 training_labels = np.array(training_labels)
-X_train, X_test, y_train, y_test = train_test_split(training_data, training_labels, test_size = 0.25, train_size = 0.75, random_state = 200)
+X_train, X_test, y_train, y_test = train_test_split(training_data, training_labels, test_size = 0.20, train_size = 0.80, random_state = 200)
 
-model = MobileNetV2(include_top = False, input_shape = (size, size, 3))
+model = NASNetMobile(include_top = False, input_shape = (size, size, 3))
 x = Flatten()(model.layers[-1].output)
 x = Dense(128, 'relu')(x)
-x = Dense(256, 'relu')(x)
-x = Dense(192, 'relu')(x)
+x = Dense(128, 'relu')(x)
+x = Dense(128, 'relu')(x)
 x = Dense(subjects_num, 'softmax')(x)
 model = Model(inputs = model.input, outputs = [x])
 model.compile('adam', 'sparse_categorical_crossentropy', ['accuracy'])
 model.summary()
 
-callback1 = EarlyStopping(patience = 75, verbose = 1, restore_best_weights = True, monitor = 'val_accuracy')
+callback1 = EarlyStopping(patience = 20, verbose = 1, restore_best_weights = True, monitor = 'val_accuracy')
 callback2 = ModelCheckpoint(checkpoint_filepath, monitor = 'val_accuracy', verbose = 1, save_weights_only = True)
 try:
     model.load_weights(checkpoint_filepath)
