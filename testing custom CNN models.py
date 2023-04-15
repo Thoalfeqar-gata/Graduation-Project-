@@ -1,8 +1,6 @@
-import cv2, face_recognition, numpy as np, tensorflow as tf
+import cv2, face_recognition, numpy as np, tensorflow as tf, utils
+from utils import to_opencv_bounding_box
 
-def to_opencv_bounding_box(location):
-    top, right, bottom, left = location
-    return (left, top, right - left, bottom - top)
 people = {
     0 : 'Ali alezerjawy',
     1 : 'Ali hayder',
@@ -14,7 +12,7 @@ people = {
     7 : 'Mahdy',
     8 : 'Sajad hashim',
     9 : 'Sajad',
-    50 : 'Unknown'
+    -1 : 'Unknown'
 }
 # people = {
 #     0 : 'Dr. Saadoon',
@@ -72,9 +70,9 @@ people = {
 
 '''
 model_type can be either ['tflite', 'tf', 'svm']
-face_detector can be eitehr ['hog', 'opencv']
+face_detector can be either ['hog', 'opencv']
 '''
-def run_face_recognition(face_detector = 'hog', frame_size = (640, 480), apply_clahe = True, model_path = 'data/models/MobileNetV2 128 optimized/model.tflite', model_type = 'tflite', face_size = (180, 180), threshold = 0.9999): 
+def run_face_recognition(face_detector = 'hog', frame_size = (640, 480), apply_clahe = True, model_path = 'data/models/MobileNetV2 128 optimized/model.tflite', model_type = 'tflite', face_size = (180, 180), threshold = 0.98): 
     video_capture = cv2.VideoCapture(0)
     video_capture.set(cv2.CAP_PROP_FRAME_WIDTH, frame_size[0])
     video_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_size[1])
@@ -112,7 +110,7 @@ def run_face_recognition(face_detector = 'hog', frame_size = (640, 480), apply_c
                 locations[i] = to_opencv_bounding_box(locations[i])
 
         for x, y, w, h in locations:
-            face = cv2.resize(frame[y : y + h, x : x + w], face_size)
+            face = utils.preprocess_image(frame, [[x, y, w, h]], size = face_size[0])[0]
             input_image = np.expand_dims(face, axis = 0).astype(np.float32)
             
             if model_type == 'tflite':
@@ -120,15 +118,16 @@ def run_face_recognition(face_detector = 'hog', frame_size = (640, 480), apply_c
                 model.invoke()
                 prediction = model.get_tensor(output_details[0]['index'])[0]
                 p = int(np.argmax(prediction, -1))
+                print(prediction[p])
                 if prediction[p] < threshold:
-                    prediction = 50
+                    prediction = -1
                 else:
                     prediction = p
             elif model_type == 'tf':
                 prediction = model.predict(input_image, verbose = '0')[0]
                 p = int(np.argmax(prediction, -1))
                 if prediction[p] < threshold:
-                    prediction = 50
+                    prediction = -1
                 else:
                     prediction = p
 
@@ -139,8 +138,8 @@ def run_face_recognition(face_detector = 'hog', frame_size = (640, 480), apply_c
         if cv2.waitKey(1) == ord('q'):
             break
     
-model_path = 'data/models/NASNet (128-128-128) optimized/model.tflite'
-run_face_recognition(apply_clahe = True, face_detector = 'cnn', model_path = model_path, model_type = 'tflite', frame_size = (640, 480))
+model_path = 'data/models/MobileNetV2 (128-128-128) optimized/model.tflite'
+run_face_recognition(apply_clahe = False, face_detector = 'hog', model_path = model_path, model_type = 'tflite', frame_size = (640, 480), face_size = (180, 180))
             
         
         

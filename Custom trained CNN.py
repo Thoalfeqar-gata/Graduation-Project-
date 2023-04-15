@@ -15,16 +15,17 @@ from sklearn.preprocessing import label_binarize
 from sklearn.metrics import f1_score, precision_score, recall_score
 from fusion import Fusion
 import tensorflow as tf
+from deepface import DeepFace
 
-size = 180
-network_name = 'NASNet (128-128-128)'
+size = 160
+network_name = 'Facenet (256-196)'
 path = 'data/database collage/detections/DB unified of friends/DB with augmentation'
 checkpoint_filepath = f'data/models/checkpoints/{network_name}/'
 subjects_num = len(os.listdir(path))
 training_data = []
 training_labels = []
 target_names = []
-limit = 1000000
+limit = 100000000
 with open('data/models/model input sizes.txt', 'a') as file:
     file.writelines(f'{network_name} = ({size}, {size})')
     
@@ -36,8 +37,9 @@ for dirname, dirnames, filenames in os.walk(path):
     target_names.append(f'S{i}')
     counter = 0
     for filename in filenames:
-        image = cv2.cvtColor(cv2.resize(cv2.imread(os.path.join(dirname, filename)), (size, size)), cv2.COLOR_BGR2RGB)
-        training_data.append(image)
+        image = cv2.imread(os.path.join(dirname, filename))
+        face = utils.preprocess_image(image, size = size)[0]
+        training_data.append(face)
         training_labels.append(int(i))
         counter += 1
         if counter >= limit:
@@ -47,17 +49,17 @@ training_data = np.array(training_data)
 training_labels = np.array(training_labels)
 X_train, X_test, y_train, y_test = train_test_split(training_data, training_labels, test_size = 0.20, train_size = 0.80, random_state = 200)
 
-model = NASNetMobile(include_top = False, input_shape = (size, size, 3))
-x = Flatten()(model.layers[-1].output)
-x = Dense(128, 'relu')(x)
-x = Dense(128, 'relu')(x)
-x = Dense(128, 'relu')(x)
+base_model = DeepFace.build_model('Facenet')
+x = base_model.output
+x = Dense(256, 'relu')(x)
+x = Dense(196, 'relu')(x)
 x = Dense(subjects_num, 'softmax')(x)
-model = Model(inputs = model.input, outputs = [x])
+model = Model(inputs = base_model.input, outputs = [x])
+for layer in base_model.layers:
+    layer.trainable = False
 model.compile('adam', 'sparse_categorical_crossentropy', ['accuracy'])
 model.summary()
-
-callback1 = EarlyStopping(patience = 20, verbose = 1, restore_best_weights = True, monitor = 'val_accuracy')
+callback1 = EarlyStopping(patience = 35, verbose = 1, restore_best_weights = True, monitor = 'val_accuracy')
 callback2 = ModelCheckpoint(checkpoint_filepath, monitor = 'val_accuracy', verbose = 1, save_weights_only = True)
 try:
     model.load_weights(checkpoint_filepath)
@@ -65,7 +67,7 @@ try:
 except:
     pass
 
-# model.fit(X_train, y_train, 32, 500, validation_split = 0.1, shuffle = False, callbacks = [callback1, callback2])
+model.fit(X_train, y_train, 32, 500, validation_split = 0.1, shuffle = False, callbacks = [callback1, callback2])
 prediction_probability = model.predict(X_test)
 model.save(f'data/models/{network_name}')
 model_converter = tf.lite.TFLiteConverter.from_keras_model(model)

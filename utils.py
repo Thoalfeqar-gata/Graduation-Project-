@@ -486,7 +486,30 @@ def extract_faces_from_database(images_path, output_path, face_detection_confide
                 cv2.imwrite(os.path.join(output_path, str(labelID), name), face)
             except:
                 continue
-        
-        
+def to_opencv_bounding_box(location):
+    top, right, bottom, left = location
+    return (left, top, right - left, bottom - top)
+
+shape_predictor = dlib.shape_predictor('data/dlib data/shape_predictor_5_face_landmarks.dat')
+def preprocess_image(image, detections, size = 160, normalize = True):
+    global shape_predictor
+    
+    if len(detections) <= 0:
+        detections = [(0, 0, image.shape[1], image.shape[0])]
+
+    dets = []
+    for x, y, w, h in detections:
+        dets.append(dlib.rectangle(left = x, top = y, right = x+w, bottom = y+h))
+    
+    faces = dlib.full_object_detections()
+    for det in dets:
+        faces.append(shape_predictor(image, det))
+    
+    if normalize:
+        faces = [face[:, :, ::-1] / 255.0 for face in dlib.get_face_chips(image, faces, size = size)]
+    else:
+        faces = [face[:, :, ::-1] for face in dlib.get_face_chips(image, faces, size = size)]
+    return faces
+
 
     

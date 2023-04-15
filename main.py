@@ -21,7 +21,7 @@ param = {
 }
 gist = GIST(param)
 path = 'data/database collage/detections/DB unified of friends/DB with augmentation'
-size = 180
+size = 160
 images_per_subject = 1500
 faces_paths = []
 subjects = []
@@ -143,12 +143,11 @@ lbp = LocalBinaryPattern(16, 2, (3,3))
 #         else:
 #             fusion.train(100, 16, patience = 30, model_layer_sizes = (256, 384, 192), separate_subjects = False, roc_title = f'ROC curve for {feature_extraction_algorithm} using {classification_algorithm} on faces.', matrix_title = f'Confusion matrix for {feature_extraction_algorithm} using {classification_algorithm} on faces', results_title = f'results for {feature_extraction_algorithm} using {classification_algorithm} on faces')
 
-with open('data/models/svm using dlib face embeddings/info.txt', 'w') as file:
+with open('data/models/Neural network using facenet face embeddings/info.txt', 'w') as file:
     file.write(f'face_size = {(size, size)}')
 fusion_obj = FeatureFusion([
     deepface_features
 ], subjects)
 fusion_obj.extract_features(faces_paths, image_size = None)
-model = fusion_obj.train_svm(separate_subjects = False, roc_title = 'ROC curve of face embeddings on friends database', matrix_title = 'Confusion matrix of face embeddings on friends database', results_title = 'face embeddings on friends database')
-file = open('data/models/svm using dlib face embeddings/model.pickle', 'wb')
-pickle.dump(model, file)
+model = fusion_obj.train(500, 32, patience = 35, separate_subjects = False, roc_title = 'ROC curve of Neural network using facenet face embeddings on friends database', matrix_title = 'Confusion matrix of Neural network using facenet face embeddings on friends database', results_title = 'Neural network using facenet face embeddings on friends database')
+model.save('data/models/Neural network using facenet face embeddings')
