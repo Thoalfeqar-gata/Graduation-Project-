@@ -53,7 +53,8 @@ def main(classifier_path, feature_extractor_path, face_detector = 'hog', classif
             dets = [utils.to_opencv_bounding_box(det) for det in  face_recognition.face_locations(frame, 1, 'hog')]
         elif face_detector == 'cnn':
             dets = [utils.to_opencv_bounding_box(det) for det in  face_recognition.face_locations(frame, 1, 'cnn')]
-            
+        elif face_detector == 'mp':
+            dets = utils.detect_faces_mp(frame)
 
         if len(dets) > 0:
             faces = utils.preprocess_image(frame, dets)
@@ -103,6 +104,6 @@ def main(classifier_path, feature_extractor_path, face_detector = 'hog', classif
 
 classifier_path = 'data/models/svm using dlib face embeddings/model.pickle'
 feature_extractor_path = 'data/models/Neural network using facenet embeddings optimized/feature extractor/model.tflite'
-main(classifier_path, feature_extractor_path, 'cnn', classifier_type = 'svm', feature_extractor_type = 'tflite')
+main(classifier_path, feature_extractor_path, 'mp', classifier_type = 'svm', feature_extractor_type = 'tflite')
     
     

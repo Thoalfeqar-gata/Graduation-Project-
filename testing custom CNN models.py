@@ -1,72 +1,72 @@
 import cv2, face_recognition, numpy as np, tensorflow as tf, utils
 from utils import to_opencv_bounding_box
 
-people = {
-    0 : 'Ali alezerjawy',
-    1 : 'Ali hayder',
-    2 : 'Humam Ali',
-    3 : 'Osama Raid',
-    4 : 'Zayn Alabedeen',
-    5 : 'Ahmed Ali',
-    6 : 'Thoalfeqar Kata',
-    7 : 'Mahdy',
-    8 : 'Sajad hashim',
-    9 : 'Sajad',
-    -1 : 'Unknown'
-}
 # people = {
-#     0 : 'Dr. Saadoon',
-#     1 : 'Dr. Muayad',
-#     2 : 'Muhammed (student)',
-#     3 : 'blank for now',
-#     4 : 'Miss Yasameen',
-#     5 : 'blank for now',
-#     6 : 'clean worker (woman)',
-#     7 : 'Dr. Ahmad Saeed',
-#     8 : 'blank for now',
-#     9 : 'blank for now',
-#     10 : 'Dr. Walaa',
-#     11 : 'blank for now',
-#     12 : 'Dr. Muhammed Ali',
-#     13 : 'Salman',
-#     14 : 'Dr. Raoof',
-#     15 : 'blank for now',
-#     16 : 'blank for now',
-#     17 : 'blank for now', 
-#     18 : 'Dr. Nidhal',
-#     19 : 'blank for now',
-#     20 : 'Dr. Dhafer',
-#     21 : 'Dr. Sarmad',
-#     22 : 'blank for now',
-#     23 : 'blank for now',
-#     24 : 'blank for now',
-#     25 : 'blank for now',
-#     26 : 'Dr. Sawsan',
-#     27 : 'Dr. Mahmood Zaky',
-#     28 : 'Engineer',
-#     29 : 'Dr. Yasameen',
-#     30 : 'Miss Zina',
-#     31 : 'Miss Hadeel',
-#     32 : 'Miss Rana', 
-#     33 : 'Dr. Basma',
-#     34 : 'blank for now',
-#     35 : 'Dr. Fatima',
-#     36 : 'blank for now',
-#     37 : 'blank for now',
-#     38 : 'blank for now',
-#     39 : 'Dr. Yaarob', 
-#     40 : 'Dr. Ez',
-#     41 : 'blank for now',
-#     42 : 'Thoalfeqar',
-#     43 : 'Ahmad Ali',
-#     44 : 'Ali Hayder',
-#     45 : 'Humam Ali',
-#     46 : 'Mahdy', 
-#     47 : 'Osama Raaid',
-#     48 : 'Sajad 1',
-#     49 : 'Sajad 2',
-#     50 : 'Unknown'
-#     }
+#     0 : 'Ali alezerjawy',
+#     1 : 'Ali hayder',
+#     2 : 'Humam Ali',
+#     3 : 'Osama Raid',
+#     4 : 'Zayn Alabedeen',
+#     5 : 'Ahmed Ali',
+#     6 : 'Thoalfeqar Kata',
+#     7 : 'Mahdy',
+#     8 : 'Sajad hashim',
+#     9 : 'Sajad',
+#     -1 : 'Unknown'
+# }
+people = {
+    0 : 'Dr. Saadoon',
+    1 : 'Dr. Muayad',
+    2 : 'Muhammed (student)',
+    3 : 'blank for now',
+    4 : 'Miss Yasameen',
+    5 : 'blank for now',
+    6 : 'clean worker (woman)',
+    7 : 'Dr. Ahmad Saeed',
+    8 : 'blank for now',
+    9 : 'blank for now',
+    10 : 'Dr. Walaa',
+    11 : 'blank for now',
+    12 : 'Dr. Muhammed Ali',
+    13 : 'Salman',
+    14 : 'Dr. Raoof',
+    15 : 'blank for now',
+    16 : 'blank for now',
+    17 : 'blank for now', 
+    18 : 'Dr. Nidhal',
+    19 : 'blank for now',
+    20 : 'Dr. Dhafer',
+    21 : 'Dr. Sarmad',
+    22 : 'blank for now',
+    23 : 'blank for now',
+    24 : 'blank for now',
+    25 : 'blank for now',
+    26 : 'Dr. Sawsan',
+    27 : 'Dr. Mahmood Zaky',
+    28 : 'Engineer',
+    29 : 'Dr. Yasameen',
+    30 : 'Miss Zina',
+    31 : 'Miss Hadeel',
+    32 : 'Miss Rana', 
+    33 : 'Dr. Basma',
+    34 : 'blank for now',
+    35 : 'Dr. Fatima',
+    36 : 'blank for now',
+    37 : 'blank for now',
+    38 : 'blank for now',
+    39 : 'Dr. Yaarob', 
+    40 : 'Dr. Ez',
+    41 : 'blank for now',
+    42 : 'Thoalfeqar',
+    43 : 'Ahmad Ali',
+    44 : 'Ali Hayder',
+    45 : 'Humam Ali',
+    46 : 'Mahdy', 
+    47 : 'Osama Raaid',
+    48 : 'Sajad 1',
+    49 : 'Sajad 2',
+    -1 : 'Unknown'
+    }
 
 '''
 model_type can be either ['tflite', 'tf', 'svm']
@@ -108,6 +108,8 @@ def run_face_recognition(face_detector = 'hog', frame_size = (640, 480), apply_c
             locations = face_recognition.face_locations(frame, 1, 'cnn')
             for i in range(len(locations)):
                 locations[i] = to_opencv_bounding_box(locations[i])
+        elif face_detector == 'mp':
+            locations = utils.detect_faces_mp(frame)
 
         for x, y, w, h in locations:
             face = utils.preprocess_image(frame, [[x, y, w, h]], size = face_size[0])[0]
@@ -118,7 +120,6 @@ def run_face_recognition(face_detector = 'hog', frame_size = (640, 480), apply_c
                 model.invoke()
                 prediction = model.get_tensor(output_details[0]['index'])[0]
                 p = int(np.argmax(prediction, -1))
-                print(prediction[p])
                 if prediction[p] < threshold:
                     prediction = -1
                 else:
@@ -138,8 +139,8 @@ def run_face_recognition(face_detector = 'hog', frame_size = (640, 480), apply_c
         if cv2.waitKey(1) == ord('q'):
             break
     
-model_path = 'data/models/MobileNetV2 (128-128-128) optimized/model.tflite'
-run_face_recognition(apply_clahe = False, face_detector = 'hog', model_path = model_path, model_type = 'tflite', frame_size = (640, 480), face_size = (180, 180))
+model_path = 'data/models/MobileNetV2 128'
+run_face_recognition(apply_clahe = True, face_detector = 'hog', model_path = model_path, model_type = 'tf', frame_size = (640, 480), face_size = (100, 100), threshold = 0.5)
             
         
         
