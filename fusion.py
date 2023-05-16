@@ -56,7 +56,7 @@ class Fusion(object):
         plt.ylabel('True Positive Rate')
         plt.xlabel('False Positive Rate')
         plt.legend(loc = 'lower right')
-        plt.savefig(f'data/results/{roc_title}.png')
+        plt.savefig(f'data/results2/{roc_title}.png')
         plt.close()
         
 
@@ -184,11 +184,11 @@ class Fusion(object):
         plt.legend(loc = 'best')
     
     def confusion_matrix(self, y_pred, y_true, matrix_title):
-        display = ConfusionMatrixDisplay.from_predictions(y_true, y_pred, display_labels = self.class_names)
+        display = ConfusionMatrixDisplay.from_predictions(y_true, y_pred, display_labels = self.class_names, cmap = 'Greys')
         figure = display.figure_
         figure.set_figwidth(27)
         figure.set_figheight(16)
-        plt.savefig(f'data/results/{matrix_title}.png')
+        plt.savefig(f'data/results2/{matrix_title}.png')
         plt.close()
 
         
@@ -198,11 +198,11 @@ class FeatureFusion(Fusion):
         super().__init__(algorithms, class_names) 
     
 
-    def extract_features(self, image_paths, batch_size = 2000, image_size = (128, 128)):
+    def extract_features(self, image_paths, batch_size = 9000, image_size = (128, 128)):
         self.number_of_classes = len(image_paths)
         self.training_labels = []
         for i, _class in enumerate(image_paths):
-            self.training_labels.extend([i] * len(_class))
+            self.training_labels.extend([int(self.class_names[i])] * len(_class))
         
         image_paths = self.preprocess_list(image_paths)
         
@@ -246,7 +246,7 @@ class FeatureFusion(Fusion):
         
         
     def train_svm(self, flip = True, test_model = True, separate_subjects = True, roc_title = 'ROC curve', matrix_title = 'Confusion matrix', results_title = ''):
-        svm = OneVsRestClassifier(SVC(kernel = 'rbf', max_iter = -1, verbose = True, probability = True), n_jobs = -1)
+        svm = OneVsRestClassifier(SVC(kernel = 'linear', max_iter = -1, verbose = True, probability = True), n_jobs = -1)
         
         if test_model:
             X_train, X_test, y_train, y_test = train_test_split(self.training_data, self.training_labels, test_size = 0.25, train_size = 0.75, random_state = 250)
@@ -264,7 +264,7 @@ class FeatureFusion(Fusion):
             f1 = f1_score(y_test, y_pred, average = 'weighted')
             precision = precision_score(y_test, y_pred, average = 'weighted')
             recall = recall_score(y_test, y_pred, average = 'weighted')
-            with open('data/results/results.txt', 'a') as results:
+            with open('data/results2/results.txt', 'a') as results:
                 results.write(results_title + f' f1 : {round(f1, 5)}, precision : {round(precision, 5)}, recall : {round(recall, 5)}\n')
                 
         else:
@@ -306,7 +306,7 @@ class FeatureFusion(Fusion):
             f1 = f1_score(y_test, y_pred, average = 'weighted')
             precision = precision_score(y_test, y_pred, average = 'weighted')
             recall = recall_score(y_test, y_pred, average = 'weighted')
-            with open('data/results/results.txt', 'a') as results:
+            with open('data/results2/results.txt', 'a') as results:
                 results.write(results_title + f' f1 : {round(f1, 5)}, precision : {round(precision, 5)}, recall : {round(recall, 5)}\n')
                
         else:
@@ -328,12 +328,11 @@ class ScoreFusion(Fusion):
             self.weights = [1 for _ in self.algorithms]  
     
     
-    def extract_features(self, image_paths, batch_size = 2000, image_size = (128, 128)):
+    def extract_features(self, image_paths, batch_size = 9000, image_size = (128, 128)):
         self.number_of_classes = len(image_paths)
         
         for i, _class in enumerate(image_paths):
-            self.training_labels.extend([i] * len(_class))
-            
+            self.training_labels.extend([int(self.class_names[i])] * len(_class))            
         image_paths = self.preprocess_list(image_paths)
 
         self.training_data = [None for _ in self.algorithms]
@@ -377,7 +376,7 @@ class ScoreFusion(Fusion):
         X_tests, y_true = [], None
 
         for i in range((len(self.algorithms))):
-            svm = OneVsRestClassifier(SVC(kernel = 'rbf', max_iter = -1, verbose = True, probability = True), n_jobs = -1)
+            svm = OneVsRestClassifier(SVC(kernel = 'linear', max_iter = -1, verbose = True, probability = True), n_jobs = -1)
             if test_model:
                 X_train, X_test, y_train, y_test = train_test_split(self.training_data[i], self.training_labels, shuffle = True, random_state = 250, test_size = 0.25, train_size = 0.75)
                 X_tests.append(X_test)
@@ -405,7 +404,7 @@ class ScoreFusion(Fusion):
             f1 = f1_score(y_test, y_pred, average = 'weighted')
             precision = precision_score(y_test, y_pred, average = 'weighted')
             recall = recall_score(y_test, y_pred, average = 'weighted')
-            with open('data/results/results.txt', 'a') as results:
+            with open('data/results2/results.txt', 'a') as results:
                 results.write(results_title + f' f1 : {round(f1, 5)}, precision : {round(precision, 5)}, recall : {round(recall, 5)}\n')
                
             self.ROC_curve(y_bin, y_pred_prob, separate_subjects, roc_title)
@@ -457,7 +456,7 @@ class ScoreFusion(Fusion):
             f1 = f1_score(y_test, y_pred, average = 'weighted')
             precision = precision_score(y_test, y_pred, average = 'weighted')
             recall = recall_score(y_test, y_pred, average = 'weighted')
-            with open('data/results/results.txt', 'a') as results:
+            with open('data/results2/results.txt', 'a') as results:
                 results.write(results_title + f' f1 : {round(f1, 5)}, precision : {round(precision, 5)}, recall : {round(recall, 5)}\n')
 
         return models

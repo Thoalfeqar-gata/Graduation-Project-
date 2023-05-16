@@ -92,7 +92,7 @@ lbp = LocalBinaryPattern(20, 3, (7,7))
 path = 'data/database collage/detections/DB unified/all faces with augmentation'
 training_data = []
 training_labels = []
-class_names = [f'S{i}' for i in range(len(os.listdir(path)))]
+class_names = [f'{i}' for i in range(len(os.listdir(path)))][0:42]
 images = []
 
 
@@ -104,6 +104,8 @@ mesh_detector = mediapipe.solutions.face_mesh.FaceMesh(static_image_mode = True,
 for dirname, dirnames, filenames in os.walk(path):
     if len(filenames) <= 0:
         continue
+    if int(os.path.split(dirname)[1]) > 41:
+        continue
     
     print(dirname)
     subject = os.path.split(dirname)[1]
@@ -111,7 +113,8 @@ for dirname, dirnames, filenames in os.walk(path):
         image = cv2.imread(os.path.join(dirname, filename))
         image = cv2.pyrUp(cv2.pyrUp(image))
         points = utils.face_mesh_mp(image, mesh_detector)
-        
+        if i > 400:
+            break
         if points is None:
             continue
         
@@ -189,7 +192,7 @@ for classification_algorithm in classification_algorithms:
         f1 = f1_score(y_test, y_pred, average = 'weighted')
         precision = precision_score(y_test, y_pred, average = 'weighted')
         recall = recall_score(y_test, y_pred, average = 'weighted')
-        with open('data/results/results.txt', 'a') as results:
+        with open('data/results2/results.txt', 'a') as results:
             results.write(f'Results for {feature_extraction_algorithm} using {classification_algorithm} on modalities. f1 : {f1}, precision : {precision}, recall : {recall}\n')
             
         fusion_obj.ROC_curve(y_bin, y_pred_proba, separate_subjects = False, roc_title = f'ROC curve for {feature_extraction_algorithm} using {classification_algorithm} on modalities')

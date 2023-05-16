@@ -21,18 +21,20 @@ param = {
 }
 gist = GIST(param)
 path = 'data/database collage/detections/DB unified of friends/DB with augmentation'
-size = 160
-images_per_subject = 1500
+size = 180
+images_per_subject = 250
 faces_paths = []
 subjects = []
 total_images = 0
-for dirname, dirnames, filenames in os.walk(path):
+for i in range(len(os.listdir(path))):
+    filenames = os.listdir(os.path.join(path, str(i)))
     if len(filenames) <= 0:
         continue
-    subject_images = [os.path.join(dirname, filename) for filename in filenames]
+    print(i)
+    subject_images = [os.path.join(path, str(i), filename) for filename in filenames]
     faces_paths.append(subject_images)
     total_images += len(subject_images)
-    subjects.append(f'{os.path.split(dirname)[1]}')
+    subjects.append(f'{i}')
 
     
 resnet50 = ResNet50(False, input_shape = (size, size, 3))
@@ -77,7 +79,6 @@ def facenet(images):
     return np.array(facenet_model.embeddings(faces))
     
         
-        
 def hog_features(images):
     features = []
     for i in tqdm(range(len(images))):
@@ -114,6 +115,7 @@ def face_embeddings(images):
 weber = WeberPattern((4, 4))
 lbp = LocalBinaryPattern(16, 2, (3,3))
 # feature_extraction_algorithms = {
+#     'VGGFace' : vggface_features,
 #     'SIFT' : SIFTBOWFeatures,
 #     'SURF' : SURFBOWFeatures,
 #     'GIST' : gist_features,
@@ -122,10 +124,9 @@ lbp = LocalBinaryPattern(16, 2, (3,3))
 #     'HOG' : hog_features,
 #     'VGG16' : vgg16_features,
 #     'VGG19' : vgg19_features,
-#     'VGGFace' : vggface_features,
 #     'Face embeddings' : face_embeddings
 # }
-# classification_algorithms = ['SVM', 'Neural Network']
+# classification_algorithms = ['Neural Network', 'SVM']
 
 # for classification_algorithm in classification_algorithms:
 #     for feature_extraction_algorithm in feature_extraction_algorithms.keys():
@@ -139,15 +140,15 @@ lbp = LocalBinaryPattern(16, 2, (3,3))
 #             fusion.extract_features(faces_paths, image_size = (size, size))
 
 #         if classification_algorithm == 'SVM':
-#             fusion.train_svm(separate_subjects = False, roc_title = f'ROC curve for {feature_extraction_algorithm} using {classification_algorithm} on faces.', matrix_title = f'Confusion matrix for {feature_extraction_algorithm} using {classification_algorithm} on faces', results_title = f'results for {feature_extraction_algorithm} using {classification_algorithm} on faces')
+#             fusion.train_svm(separate_subjects = True, roc_title = f'ROC curve for {feature_extraction_algorithm} using {classification_algorithm} on faces.', matrix_title = f'Confusion matrix for {feature_extraction_algorithm} using {classification_algorithm} on faces', results_title = f'results for {feature_extraction_algorithm} using {classification_algorithm} on faces')
 #         else:
-#             fusion.train(100, 16, patience = 30, model_layer_sizes = (256, 384, 192), separate_subjects = False, roc_title = f'ROC curve for {feature_extraction_algorithm} using {classification_algorithm} on faces.', matrix_title = f'Confusion matrix for {feature_extraction_algorithm} using {classification_algorithm} on faces', results_title = f'results for {feature_extraction_algorithm} using {classification_algorithm} on faces')
+#             fusion.train(120, 32, patience = 30, model_layer_sizes = (256, 384, 192), separate_subjects = False, roc_title = f'ROC curve for {feature_extraction_algorithm} using {classification_algorithm} on faces.', matrix_title = f'Confusion matrix for {feature_extraction_algorithm} using {classification_algorithm} on faces', results_title = f'results for {feature_extraction_algorithm} using {classification_algorithm} on faces')
 
 with open('data/models/Neural network using facenet face embeddings/info.txt', 'w') as file:
     file.write(f'face_size = {(size, size)}')
 fusion_obj = FeatureFusion([
-    deepface_features
+    facenet
 ], subjects)
 fusion_obj.extract_features(faces_paths, image_size = None)
-model = fusion_obj.train(500, 32, patience = 35, separate_subjects = False, roc_title = 'ROC curve of Neural network using facenet face embeddings on friends database', matrix_title = 'Confusion matrix of Neural network using facenet face embeddings on friends database', results_title = 'Neural network using facenet face embeddings on friends database')
-model.save('data/models/Neural network using facenet face embeddings')
+model = fusion_obj.train_svm(separate_subjects = False, roc_title = 'ROC curve of SVM using facenet face embeddings on friends database', matrix_title = 'Confusion matrix of SVM using facenet face embeddings on friends database', results_title = 'SVM using facenet face embeddings on friends database')
+model.save('data/models/svm using facenet face embeddings')

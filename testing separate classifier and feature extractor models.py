@@ -19,7 +19,7 @@ classifier_types = [tf, svm, tflite]
 feature_extractor_type = [tf, tflite]
 face_detector = [opencv, hog, cnn]
 '''
-def main(classifier_path, feature_extractor_path, face_detector = 'hog', classifier_type = 'tf', feature_extractor_type = 'tf', threshold = 0.98, show_fps = True):
+def main(classifier_path, feature_extractor_path, face_detector = 'hog', classifier_type = 'tf', feature_extractor_type = 'tf', threshold = 0.95, show_fps = True):
     if classifier_type == 'tf':
         classifier = tf.keras.models.load_model(filepath = classifier_path)
     elif classifier_type == 'tflite':
