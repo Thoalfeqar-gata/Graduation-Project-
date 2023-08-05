@@ -12,7 +12,7 @@ from tqdm import tqdm
 from sklearn.svm import SVC
 from sklearn.multiclass import OneVsRestClassifier
 from keras.callbacks import EarlyStopping
-from sklearn.metrics import f1_score, precision_score, recall_score
+from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
 
 class Fusion(object):
     def __init__(self, algorithms, class_names):
@@ -56,7 +56,7 @@ class Fusion(object):
         plt.ylabel('True Positive Rate')
         plt.xlabel('False Positive Rate')
         plt.legend(loc = 'lower right')
-        plt.savefig(f'data/results2/{roc_title}.png')
+        plt.savefig(f'data/results/{roc_title}.png')
         plt.close()
         
 
@@ -186,9 +186,9 @@ class Fusion(object):
     def confusion_matrix(self, y_pred, y_true, matrix_title):
         display = ConfusionMatrixDisplay.from_predictions(y_true, y_pred, display_labels = self.class_names, cmap = 'Greys')
         figure = display.figure_
-        figure.set_figwidth(27)
-        figure.set_figheight(16)
-        plt.savefig(f'data/results2/{matrix_title}.png')
+        figure.set_figwidth(100)
+        figure.set_figheight(100)
+        plt.savefig(f'data/results/{matrix_title}.png')
         plt.close()
 
         
@@ -241,7 +241,7 @@ class FeatureFusion(Fusion):
             current_batch += 1
         
         self.training_data = np.array(self.training_data)
-        self.training_labels = np.array(self.training_labels)    
+        self.training_labels = np.array(self.training_labels)
             
         
         
@@ -261,11 +261,12 @@ class FeatureFusion(Fusion):
             # self.genuine_vs_imposter(X_test, y_test, svm.predict_proba)
             self.confusion_matrix(y_pred, y_test, matrix_title = matrix_title)
             self.ROC_curve(y_bin, y_pred_prob, separate_subjects, roc_title)
-            f1 = f1_score(y_test, y_pred, average = 'weighted')
-            precision = precision_score(y_test, y_pred, average = 'weighted')
-            recall = recall_score(y_test, y_pred, average = 'weighted')
-            with open('data/results2/results.txt', 'a') as results:
-                results.write(results_title + f' f1 : {round(f1, 5)}, precision : {round(precision, 5)}, recall : {round(recall, 5)}\n')
+            f1 = f1_score(y_test, y_pred, average = 'micro')
+            precision = precision_score(y_test, y_pred, average = 'micro')
+            recall = recall_score(y_test, y_pred, average = 'micro')
+            accuracy = accuracy_score(y_test, y_pred)
+            with open('data/results/results.txt', 'a') as results:
+                results.write(results_title + f' f1 : {f1}, precision : {precision}, recall : {recall}, accuracy : {accuracy}\n')
                 
         else:
             svm.fit(self.training_data, self.training_labels)
@@ -303,12 +304,13 @@ class FeatureFusion(Fusion):
             # self.genuine_vs_imposter(X_test, y_test, predict)
             self.confusion_matrix(y_pred, y_test, matrix_title = matrix_title)
             self.ROC_curve(y_bin, y_pred_prob, separate_subjects, roc_title)
-            f1 = f1_score(y_test, y_pred, average = 'weighted')
-            precision = precision_score(y_test, y_pred, average = 'weighted')
-            recall = recall_score(y_test, y_pred, average = 'weighted')
-            with open('data/results2/results.txt', 'a') as results:
-                results.write(results_title + f' f1 : {round(f1, 5)}, precision : {round(precision, 5)}, recall : {round(recall, 5)}\n')
-               
+            f1 = f1_score(y_test, y_pred, average = 'micro')
+            precision = precision_score(y_test, y_pred, average = 'micro')
+            recall = recall_score(y_test, y_pred, average = 'micro')
+            accuracy = accuracy_score(y_test, y_pred)
+            with open('data/results/results.txt', 'a') as results:
+                results.write(results_title + f' f1 : {f1}, precision : {precision}, recall : {recall}, accuracy : {accuracy}\n')
+                
         else:
             model.fit(self.training_data, self.training_labels, batch_size = batch_size, epochs = epochs, shuffle = False, validation_split = 0.1, callbacks = [callback])
         
@@ -376,7 +378,7 @@ class ScoreFusion(Fusion):
         X_tests, y_true = [], None
 
         for i in range((len(self.algorithms))):
-            svm = OneVsRestClassifier(SVC(kernel = 'linear', max_iter = -1, verbose = True, probability = True), n_jobs = -1)
+            svm = OneVsRestClassifier(SVC(kernel = 'rbf', max_iter = -1, verbose = True, probability = True), n_jobs = -1)
             if test_model:
                 X_train, X_test, y_train, y_test = train_test_split(self.training_data[i], self.training_labels, shuffle = True, random_state = 250, test_size = 0.25, train_size = 0.75)
                 X_tests.append(X_test)
@@ -400,13 +402,14 @@ class ScoreFusion(Fusion):
             print(classification_report(y_true, y_pred, target_names = self.class_names, labels = np.unique(self.training_labels)))
             # self.FAR_FRR(X_tests, y_test, self.vote_svm, flip)
             # self.genuine_vs_imposter(X_tests, y_test, self.vote_svm)
-            # self.confusion_matrix(y_pred, y_test, matrix_title = matrix_title)
-            f1 = f1_score(y_test, y_pred, average = 'weighted')
-            precision = precision_score(y_test, y_pred, average = 'weighted')
-            recall = recall_score(y_test, y_pred, average = 'weighted')
-            with open('data/results2/results.txt', 'a') as results:
-                results.write(results_title + f' f1 : {round(f1, 5)}, precision : {round(precision, 5)}, recall : {round(recall, 5)}\n')
-               
+            self.confusion_matrix(y_pred, y_test, matrix_title = matrix_title)
+            f1 = f1_score(y_test, y_pred, average = 'micro')
+            precision = precision_score(y_test, y_pred, average = 'micro')
+            recall = recall_score(y_test, y_pred, average = 'micro')
+            accuracy = accuracy_score(y_test, y_pred)
+            with open('data/results/results.txt', 'a') as results:
+                results.write(results_title + f' f1 : {f1}, precision : {precision}, recall : {recall}, accuracy : {accuracy}\n')
+                
             self.ROC_curve(y_bin, y_pred_prob, separate_subjects, roc_title)
         return models
     
@@ -425,7 +428,7 @@ class ScoreFusion(Fusion):
             
             model = Sequential(layers)
             model.compile(Adam(), 'sparse_categorical_crossentropy', ['accuracy'])
-            callback = EarlyStopping(patience = patience, verbose = 1, restore_best_weights = True)
+            callback = EarlyStopping(patience = patience, verbose = 1, restore_best_weights = True, monitor = 'val_accuracy')
 
             if test_model:
                 X_train, X_test, y_train, y_test = train_test_split(self.training_data[i], self.training_labels, test_size = 0.25, train_size = 0.75, random_state = 250, shuffle = True)
@@ -451,14 +454,15 @@ class ScoreFusion(Fusion):
             print(classification_report(y_true, y_pred, target_names = self.class_names, labels = np.unique(self.training_labels)))
             # self.FAR_FRR(X_tests, y_test, self.vote_svm, flip)
             # self.genuine_vs_imposter(X_tests, y_test, self.vote_svm)
-            # self.confusion_matrix(y_pred, y_test, matrix_title = matrix_title)
+            self.confusion_matrix(y_pred, y_test, matrix_title = matrix_title)
             self.ROC_curve(y_bin, y_pred_prob, separate_subjects, roc_title)
-            f1 = f1_score(y_test, y_pred, average = 'weighted')
-            precision = precision_score(y_test, y_pred, average = 'weighted')
-            recall = recall_score(y_test, y_pred, average = 'weighted')
-            with open('data/results2/results.txt', 'a') as results:
-                results.write(results_title + f' f1 : {round(f1, 5)}, precision : {round(precision, 5)}, recall : {round(recall, 5)}\n')
-
+            f1 = f1_score(y_test, y_pred, average = 'micro')
+            precision = precision_score(y_test, y_pred, average = 'micro')
+            recall = recall_score(y_test, y_pred, average = 'micro')
+            accuracy = accuracy_score(y_test, y_pred)
+            with open('data/results/results.txt', 'a') as results:
+                results.write(results_title + f' f1 : {f1}, precision : {precision}, recall : {recall}, accuracy : {accuracy}\n')
+                
         return models
 
 

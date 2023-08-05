@@ -6,11 +6,11 @@ transform = A.Compose([
     A.CLAHE(p = 0.8),
     A.RandomBrightnessContrast(brightness_limit = 0.2, contrast_limit = 0.1, p = 0.8),
     # A.RandomGamma(gamma_limit = (50, 80), p = 0.5),
-    # A.GaussianBlur(blur_limit = (3, 3), p = 0.5),
+    A.GaussianBlur(blur_limit = (3, 3), p = 0.5),
     # A.Emboss(alpha = (0.1, 0.3), strength = (0.1, 0.4), p = 0.5),
     # A.FancyPCA(p = 0.5),
-    # A.GaussNoise(p = 0.5),
-    # A.ImageCompression(quality_lower = 99, compression_type = A.augmentations.transforms.ImageCompression.ImageCompressionType.JPEG, p = 0.5),
+    A.GaussNoise(p = 0.5),
+    A.ImageCompression(quality_lower = 99, compression_type = A.augmentations.transforms.ImageCompression.ImageCompressionType.JPEG, p = 0.5),
     # A.ISONoise(intensity = (0.1, 0.15), p = 0.5),
     # A.PixelDropout(p = 0.5),
     # A.RandomShadow(shadow_dimension = 3, p = 0.5),
@@ -20,15 +20,15 @@ transform = A.Compose([
     # A.InvertImg(),
     # A.Affine(scale = (0.9, 1.1), translate_percent = (0, 0.05), rotate = (0, 5)),
     # A.CoarseDropout(max_holes = 4),
-    # A.MedianBlur(blur_limit = 3),
-    # A.Resize(144, 144, cv2.INTER_CUBIC, p = 0.5),
+    A.MedianBlur(blur_limit = 3),
+    A.Resize(144, 144, cv2.INTER_CUBIC, p = 0.5),
     # A.MultiplicativeNoise()
 ])
 
-path = os.path.join('data', 'database collage', 'detections', 'DB unified of friends', 'DB without augmentation')
-output_path = os.path.join('data', 'database collage', 'detections', 'DB unified of friends', 'DB with augmentation')
-increase_amount = 4
-maximum_images_per_subject = 4000
+path = os.path.join('data', 'database collage', 'detections', 'DB unified', 'all faces')
+output_path = os.path.join('data', 'database collage', 'detections', 'DB unified', 'all faces with augmentation')
+increase_amount = 25
+maximum_images_per_subject = 1000
 subjects = os.listdir(path)
 
 for index in tqdm(range(len(subjects))):
